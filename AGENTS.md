@@ -22,6 +22,34 @@
 - **Rush completion**: Never mark tasks complete without verification
 - **Over-exploration**: Stop searching when sufficient context found
 
+## TESTING GUIDELINES (Next.js + Convex)
+
+### Unit Tests (`bun test` in `tests/`)
+- DO test utility functions, helpers, and pure logic in `tests/unit/`
+- DO test React components with happy-dom in `tests/components/`
+- DO test env validation logic to catch missing config early
+- DO NOT test Convex functions with bun test (use vitest instead)
+
+### Convex Tests (`bun run test:convex` with vitest in `convex/*.test.ts`)
+- DO test that required env vars throw descriptive errors when missing
+- DO test Convex queries, mutations, and actions with `convex-test`
+- DO test auth module initialization and configuration
+- DO NOT skip env validation tests - they catch deployment misconfigs
+
+### E2E Tests (`bun run test:e2e` with Playwright in `e2e/`)
+- DO test actual form submissions, not just UI visibility
+- DO verify API responses don't contain config errors (500s with secret/env messages)
+- DO test auth flows end-to-end: signup → login → protected route → logout
+- DO test that unauthenticated users are redirected from protected routes
+- DO use specific selectors (e.g., `div[class*="bg-destructive"]`) not generic ones
+- DO NOT assume UI rendering means backend is configured correctly
+- DO NOT write tests that only check element visibility without exercising functionality
+
+### General Testing Rules
+- DO run all test suites before marking feature complete: `bun test && bun run test:convex && bun run test:e2e`
+- DO add startup validation for required env vars in `src/lib/env.ts`
+- DO test error paths, not just happy paths
+- DO NOT trust that "it renders" means "it works"
 
 ## NOTES
 
