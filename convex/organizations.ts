@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
-import { authComponent, createAuth } from "./auth";
 import { createConvexLogger } from "./lib/log";
+import { getUserOrganizations, hasUserOrganizations } from "./model/organizations";
 
 const logger = createConvexLogger({ module: "organizations" });
 
@@ -9,21 +9,13 @@ export const hasOrganizations = query({
 	args: {},
 	returns: v.boolean(),
 	handler: async (ctx) => {
-		const user = await authComponent.getAuthUser(ctx);
-		if (!user) {
-			return false;
-		}
-
-		const { auth, headers } = await authComponent.getAuth(createAuth, ctx);
-		const orgsResult = await auth.api.listOrganizations({ headers });
+		const hasOrgs = await hasUserOrganizations(ctx);
 
 		logger.debug("Checked user organizations", {
-			userId: user._id,
-			hasOrgs: orgsResult.length > 0,
-			count: orgsResult.length,
+			hasOrgs,
 		});
 
-		return orgsResult.length > 0;
+		return hasOrgs;
 	},
 });
 
@@ -37,18 +29,7 @@ export const listUserOrganizations = query({
 		}),
 	),
 	handler: async (ctx) => {
-		const user = await authComponent.getAuthUser(ctx);
-		if (!user) {
-			return [];
-		}
-
-		const { auth, headers } = await authComponent.getAuth(createAuth, ctx);
-		const orgsResult = await auth.api.listOrganizations({ headers });
-
-		return orgsResult.map((org) => ({
-			id: org.id,
-			name: org.name,
-			slug: org.slug,
-		}));
+		const { organizations } = await getUserOrganizations(ctx);
+		return organizations;
 	},
 });

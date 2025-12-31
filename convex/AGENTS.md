@@ -1,3 +1,50 @@
+# Convex Backend Directory Structure
+
+```
+convex/
+├── _generated/           # Auto-generated (DO NOT EDIT)
+├── betterAuth/           # Better Auth component (managed by library)
+├── lib/                  # Shared utilities and config
+│   ├── auth-options.ts   # Auth config (breaks circular deps)
+│   └── log.ts            # Logger
+├── model/                # Business logic helpers (thin API, thick model)
+│   ├── auth.ts           # Auth helpers: getAuthenticatedUser, isAuthenticated
+│   └── organizations.ts  # Org helpers: getUserOrganizations, hasUserOrganizations
+├── auth.ts               # Auth public API (thin wrapper over model)
+├── auth.config.ts        # Auth configuration
+├── http.ts               # HTTP router (must stay at root)
+├── organizations.ts      # Organizations public API (thin wrapper)
+└── schema.ts             # Database schema (must stay at root)
+```
+
+## Layer Responsibilities
+
+| Layer | Purpose | Example |
+|-------|---------|---------|
+| `model/` | Business logic, reusable helpers, type guards | `getAuthenticatedUser(ctx)` |
+| `lib/` | Shared config, utilities, breaking circular deps | `createAuthOptions()`, logger |
+| Root `.ts` | Public API endpoints (thin wrappers) | `query({...})`, `mutation({...})` |
+
+## Where to Put New Code
+
+| Adding | Location | Notes |
+|--------|----------|-------|
+| New public query/mutation | Root `convex/` | Thin wrapper that calls model helpers |
+| Reusable business logic | `convex/model/` | Pure helpers, type guards, ctx-dependent utilities |
+| Shared configuration | `convex/lib/` | Avoid circular deps, exports only config/types |
+| HTTP endpoints | `convex/http.ts` | Must be at root (Convex requirement) |
+| Schema changes | `convex/schema.ts` | Must be at root (Convex requirement) |
+
+## Anti-Patterns (Convex Structure)
+
+- **Moving `schema.ts`**: Must stay at convex root
+- **Moving `http.ts`**: Must stay at convex root  
+- **Public functions in subdirs**: Breaks file-based routing API paths
+- **Circular imports**: Use `lib/` layer to break cycles
+- **Business logic in API files**: Extract to `model/` layer
+
+---
+
 ### Adding Logging to New Features
 
 **Convex Functions:**
