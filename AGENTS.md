@@ -1,7 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-30T18:37:00+05:30
-**Commit:** d7e45f0
+**Generated:** 2025-12-31
 **Branch:** main
 
 ## OVERVIEW
@@ -20,11 +19,17 @@ vinci/
 │   ├── components/
 │   │   ├── ui/           # Shadcn-style components
 │   │   └── providers/    # ConvexClientProvider
-│   └── lib/              # Utils, auth clients, env validation
+│   └── lib/
+│       ├── logging/      # Logging infrastructure (see LOGGING section)
+│       └── ...           # Utils, auth clients, env validation
 ├── convex/               # Backend (has own AGENTS.md)
+│   ├── lib/log.ts        # Convex logger
 │   ├── auth.ts           # Better Auth integration
 │   ├── http.ts           # HTTP router for auth routes
-│   └── schema.ts         # Database schema (currently empty)
+│   └── schema.ts         # Database schema
+├── scripts/              # Dev tooling
+│   └── convex-log-router.ts  # Captures Convex logs to files
+├── .logs/                # Log files (gitignored)
 ├── tests/                # Unit + component tests (bun test)
 ├── e2e/                  # Playwright E2E tests
 └── biome.json            # Linter/formatter config
@@ -42,6 +47,7 @@ vinci/
 | Configure env vars | `src/lib/env.ts` | Startup validation |
 | Auth client hooks | `src/lib/auth-client.ts` | signIn, signUp, useSession |
 | Auth server utils | `src/lib/auth-server.ts` | isAuthenticated, getToken |
+| Add logging | `src/lib/logging/` | See LOGGING section below |
 
 ## CONVENTIONS
 
@@ -62,7 +68,118 @@ vinci/
 - **Test Convex with bun**: Use `bun run test:convex` (vitest)
 - **Skip env validation**: Always test env errors
 
+---
+
+## LOGGING (FOR AI AGENTS)
+
+Structured logging to `.logs/` directory for debugging. **Use this to verify feature completion and debug issues.**
+
+### Log Files
+
+| File | Source | Format |
+|------|--------|--------|
+| `.logs/next-YYYY-MM-DD.jsonl` | Next.js API routes | JSONL (Pino) |
+| `.logs/convex-YYYY-MM-DD.jsonl` | Convex functions | JSONL (via log router) |
+
+### Adding Logging to New Features
+
+**Next.js API Route (Node.js runtime):**
+```typescript
+import { createLogger } from "@/lib/logging";
+import { getTraceIdFromHeaders } from "@/lib/logging/trace";
+
+const logger = createLogger({
+  level: process.env.LOG_LEVEL ?? "info",
+  logDir: process.env.LOG_DIR ?? ".logs",
+  silent: process.env.LOG_SILENT === "true",
+});
+
+export async function POST(request: NextRequest) {
+  const traceId = getTraceIdFromHeaders(request.headers);
+  
+  logger.info("Operation started", { traceId, userId, action: "create" });
+  
+  try {
+    // ... your code
+    logger.info("Operation completed", { traceId, result: "success" });
+  } catch (error) {
+    logger.error("Operation failed", {
+      traceId,
+      error: { name: error.name, message: error.message, stack: error.stack }
+    });
+    throw error;
+  }
+}
+```
+
+**Next.js Middleware (Edge runtime - no file logging):**
+```typescript
+import { edgeLogger } from "@/lib/logging/logger-edge";
+
+export function middleware(request: NextRequest) {
+  edgeLogger.info("Request", { path: request.nextUrl.pathname });
+}
+```
+
+**Convex Functions:**
+```typescript
+import { createConvexLogger } from "./lib/log";
+
+const logger = createConvexLogger({ module: "myModule" });
+
+export const myMutation = mutation({
+  handler: async (ctx, args) => {
+    logger.info("Mutation started", { userId: args.userId });
+    // ... your code
+    logger.info("Mutation completed", { resultId: result._id });
+  },
+});
+```
+
+### Reading Logs for Debugging
+
+```bash
+# View Next.js logs (formatted)
+cat .logs/next-*.jsonl | jq '.'
+
+# View Convex logs
+cat .logs/convex-*.jsonl | jq '.'
+
+# Filter by trace ID
+cat .logs/next-*.jsonl | jq 'select(.traceId == "abc-123")'
+
+# Filter errors only
+cat .logs/next-*.jsonl | jq 'select(.level == "error")'
+
+# Tail logs in real-time
+bun run logs:tail:next
+bun run logs:tail:convex
+```
+
+### Verifying Feature Completion via Logs
+
+1. **Start servers with logging**: `bun run dev:all` (uses log router for Convex)
+2. **Trigger the feature** (via curl, browser, or E2E test)
+3. **Read logs** to verify:
+   - Request reached the endpoint (check `path`)
+   - Operation completed successfully (check `level: "info"` with completion message)
+   - No errors (check `level: "error"`)
+   - Response status is correct (check `statusCode`)
+
+**Example verification:**
+```bash
+# After triggering login
+cat .logs/next-*.jsonl | jq 'select(.path == "/api/auth/sign-in/email")'
+
+# Expected: info "Auth request started", info "Auth request completed" with statusCode 200
+# If error: error "Auth request error" with error details
+```
+
+---
+
 ## TESTING
+
+### Commands
 
 ```bash
 bun test              # Unit + component tests
@@ -71,6 +188,8 @@ bun run test:e2e      # Playwright E2E
 bun run test:all      # All suites
 ```
 
+### Test Locations
+
 | Layer | Framework | Location | Environment |
 |-------|-----------|----------|-------------|
 | Unit | bun:test | `tests/unit/` | Node |
@@ -78,16 +197,103 @@ bun run test:all      # All suites
 | Convex | vitest + convex-test | `convex/*.test.ts` | edge-runtime |
 | E2E | Playwright | `e2e/` | Browser (Chrome, Firefox, WebKit) |
 
+### Test Style (BDD Comments)
+
+```typescript
+it("#given X #when Y #then Z", () => {
+  // #given - setup
+  const input = "test";
+  
+  // #when - action
+  const result = myFunction(input);
+  
+  // #then - assertion
+  expect(result).toBe("expected");
+});
+```
+
+---
+
+## DEVELOPMENT WORKFLOW
+
+### Creating a New Feature
+
+1. **Understand scope**: Read existing code in target location
+2. **Add logging**: Include structured logs at entry/exit/error points
+3. **Write tests first** (if applicable): Unit tests for logic, E2E for user flows
+4. **Implement feature**
+5. **Verify via logs**: Start servers, trigger feature, read `.logs/` files
+6. **Run all checks**:
+   ```bash
+   bun run lint && bun run typecheck && bun test && bun run test:convex
+   ```
+
+### Refactoring / Enhancement Checklist
+
+Before marking complete, **ALL must pass**:
+
+```bash
+# 1. Linting (auto-fix first)
+bun run lint:fix
+bun run lint          # Must exit 0
+
+# 2. Type checking
+bun run typecheck     # Must exit 0
+
+# 3. Unit + Component tests
+bun test              # All tests pass
+
+# 4. Convex tests
+bun run test:convex   # All tests pass
+
+# 5. E2E tests (if UI changed)
+bun run test:e2e      # All tests pass
+```
+
+**If tests fail after your changes:**
+- Fix the code to make tests pass, OR
+- Update tests if behavior intentionally changed (document why)
+
+**Never skip failing tests. Never delete tests to make them pass.**
+
+### Verification Checklist (Before Completion)
+
+- [ ] `bun run lint` passes
+- [ ] `bun run typecheck` passes
+- [ ] `bun test` passes (unit + component)
+- [ ] `bun run test:convex` passes
+- [ ] Feature works manually (verified via logs or browser)
+- [ ] No `level: "error"` in `.logs/` during happy path
+
+---
+
 ## COMMANDS
 
 ```bash
+# Development
 bun run dev           # Next.js with Turbopack
-bun run dev:convex    # Convex backend dev server
+bun run dev:convex    # Convex with log capture to .logs/
+bun run dev:convex:raw # Convex without log capture
 bun run dev:all       # Both in parallel
+
+# Build
 bun run build         # Production build
+
+# Quality
 bun run lint          # Biome check
 bun run lint:fix      # Biome auto-fix
 bun run typecheck     # tsc --noEmit
+
+# Testing
+bun test              # Unit + component
+bun run test:convex   # Convex tests
+bun run test:e2e      # Playwright E2E
+bun run test:all      # All suites
+
+# Logs
+bun run logs:clear        # Clear all log files
+bun run logs:tail:next    # Tail Next.js logs (pino-pretty)
+bun run logs:tail:convex  # Tail Convex logs
 ```
 
 ## TECH STACK
@@ -100,11 +306,13 @@ bun run typecheck     # tsc --noEmit
 | Styling | Tailwind CSS v4 |
 | UI | Radix primitives, Shadcn pattern |
 | Testing | bun:test, vitest, Playwright |
+| Logging | Pino (Next.js), structured console (Convex) |
 | Tooling | Biome (lint + format), TypeScript 5 |
 
 ## NOTES
 
 - **Empty schema**: `convex/schema.ts` is placeholder - auth tables managed by better-auth component
-- **No middleware**: No global auth middleware yet - handle per-route
-- **Convex AGENTS.md**: Contains 700+ lines of Convex-specific guidelines - read it for backend work
+- **Middleware**: `src/middleware.ts` injects trace IDs for request correlation
+- **Convex AGENTS.md**: Contains Convex-specific guidelines - read it for backend work
 - **Env validation**: `src/lib/env.ts` validates at startup - add new vars there
+- **Log files**: `.logs/` is gitignored - logs are for local dev debugging only
