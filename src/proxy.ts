@@ -1,9 +1,15 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { edgeLogger } from "@/lib/logging/logger-edge";
+import { createNodeLogger } from "@/lib/logging/logger-node";
 import { generateTraceId, TRACE_ID_COOKIE, TRACE_ID_HEADER } from "@/lib/logging/trace";
 
-export function middleware(request: NextRequest) {
+const logger = createNodeLogger({
+	level: process.env.LOG_LEVEL ?? "info",
+	logDir: process.env.LOG_DIR ?? ".logs",
+	silent: process.env.LOG_SILENT === "true",
+});
+
+export function proxy(request: NextRequest) {
 	const startTime = Date.now();
 	const existingTraceId = request.headers.get(TRACE_ID_HEADER);
 	const traceId = existingTraceId ?? generateTraceId();
@@ -14,7 +20,8 @@ export function middleware(request: NextRequest) {
 	const { pathname, search } = request.nextUrl;
 	const method = request.method;
 
-	edgeLogger.info("Request started", {
+	logger.info({
+		msg: "Request started",
 		traceId,
 		method,
 		path: pathname,
@@ -39,7 +46,8 @@ export function middleware(request: NextRequest) {
 	});
 
 	const durationMs = Date.now() - startTime;
-	edgeLogger.info("Request completed", {
+	logger.info({
+		msg: "Request completed",
 		traceId,
 		method,
 		path: pathname,

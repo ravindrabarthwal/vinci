@@ -112,12 +112,18 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-**Next.js Middleware (Edge runtime - no file logging):**
+**Next.js Proxy (Node.js runtime - replaces middleware in Next.js 16+):**
 ```typescript
-import { edgeLogger } from "@/lib/logging/logger-edge";
+import { createNodeLogger } from "@/lib/logging/logger-node";
 
-export function middleware(request: NextRequest) {
-  edgeLogger.info("Request", { path: request.nextUrl.pathname });
+const logger = createNodeLogger({
+  level: process.env.LOG_LEVEL ?? "info",
+  logDir: process.env.LOG_DIR ?? ".logs",
+  silent: process.env.LOG_SILENT === "true",
+});
+
+export function proxy(request: NextRequest) {
+  logger.info({ msg: "Request", path: request.nextUrl.pathname });
 }
 ```
 
@@ -228,9 +234,32 @@ it("#given X #when Y #then Z", () => {
    bun run lint && bun run typecheck && bun test && bun run test:convex
    ```
 
+### Critical Infrastructure Files (MANDATORY full test suite)
+
+Changes to these files affect the entire application. **NO EXCEPTIONS: ALWAYS run `bun run test:all` when touching these files, regardless of how "minor" the change seems.**
+
+| File/Directory | Why Full Testing Required |
+|----------------|---------------------------|
+| `next.config.ts` | Build behavior, bundling, routing - affects how entire app compiles and runs |
+| `src/proxy.ts` | Intercepts ALL requests - auth, tracing, headers. Silent failure = broken app |
+| `src/lib/logging/` | Debugging infrastructure - silent failures are the worst kind |
+| `src/lib/env.ts` | Startup validation - app won't run if broken |
+| `src/lib/auth-*.ts` | Authentication - security critical, affects all protected routes |
+| `tsconfig.json` | Type resolution affects entire codebase |
+| `biome.json` | Linting rules - can cause CI failures across all files |
+| `convex/auth.ts` | Backend auth - security critical |
+| `convex/http.ts` | API routing - breaks all external calls if misconfigured |
+| `convex/schema.ts` | Database schema - data integrity at stake |
+
+**⚠️ The rationalization trap:** "It's just a config change" or "I only renamed a function" are EXACTLY when bugs slip through. A 1-line change to `proxy.ts` can break authentication for every user. Lint + typecheck passing means NOTHING if runtime behavior is broken.
+
+**If you touched any file above → run `bun run test:all` → NO EXCEPTIONS.**
+
+---
+
 ### Refactoring / Enhancement Checklist
 
-Before marking complete, **ALL must pass**:
+Before marking complete, **ALL must pass - NO EXCEPTIONS:**
 
 ```bash
 # 1. Linting (auto-fix first)
@@ -246,8 +275,10 @@ bun test              # All tests pass
 # 4. Convex tests
 bun run test:convex   # All tests pass
 
-# 5. E2E tests (if UI changed)
+# 5. E2E tests
 bun run test:e2e      # All tests pass
+# ⚠️ REQUIRED if: UI changed OR any Critical Infrastructure File touched
+# Skip ONLY if: pure backend logic change with no request flow impact
 ```
 
 **If tests fail after your changes:**
@@ -258,12 +289,17 @@ bun run test:e2e      # All tests pass
 
 ### Verification Checklist (Before Completion)
 
+**ALL boxes must be checked - NO EXCEPTIONS:**
+
 - [ ] `bun run lint` passes
 - [ ] `bun run typecheck` passes
 - [ ] `bun test` passes (unit + component)
 - [ ] `bun run test:convex` passes
+- [ ] `bun run test:e2e` passes (if UI or Critical Infrastructure changed)
 - [ ] Feature works manually (verified via logs or browser)
 - [ ] No `level: "error"` in `.logs/` during happy path
+
+**If you modified a Critical Infrastructure File, you MUST run `bun run test:all` before marking complete.**
 
 ---
 
@@ -312,7 +348,7 @@ bun run logs:tail:convex  # Tail Convex logs
 ## NOTES
 
 - **Empty schema**: `convex/schema.ts` is placeholder - auth tables managed by better-auth component
-- **Middleware**: `src/middleware.ts` injects trace IDs for request correlation
+- **Proxy**: `src/proxy.ts` injects trace IDs for request correlation (Next.js 16+ uses proxy instead of middleware)
 - **Convex AGENTS.md**: Contains Convex-specific guidelines - read it for backend work
 - **Env validation**: `src/lib/env.ts` validates at startup - add new vars there
 - **Log files**: `.logs/` is gitignored - logs are for local dev debugging only

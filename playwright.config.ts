@@ -28,8 +28,9 @@ export default defineConfig({
 		},
 	],
 	webServer: {
-		command: "bun run dev",
+		command: "bun run dev:all",
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
+		timeout: 120000, // Convex takes longer to start
 	},
 });
