@@ -1,6 +1,6 @@
 "use client";
 
-import { getTraceIdFromCookie } from "./trace";
+import { getTraceIdFromCookie } from "./trace-client";
 import type { LogContext, Logger, LogLevel } from "./types";
 
 const SERVICE_NAME = "vinci-client";
@@ -105,6 +105,26 @@ export function createClientLogger(bindings: LogContext = {}): Logger {
 export const clientLogger = createClientLogger();
 
 let globalErrorHandlersInitialized = false;
+let originalConsoleError: typeof console.error | null = null;
+let originalConsoleWarn: typeof console.warn | null = null;
+
+function formatConsoleArgs(args: unknown[]): string {
+	return args
+		.map((arg) => {
+			if (arg instanceof Error) {
+				return `${arg.name}: ${arg.message}`;
+			}
+			if (typeof arg === "object") {
+				try {
+					return JSON.stringify(arg);
+				} catch {
+					return String(arg);
+				}
+			}
+			return String(arg);
+		})
+		.join(" ");
+}
 
 export function initClientErrorHandlers(): void {
 	if (globalErrorHandlersInitialized) return;
@@ -125,5 +145,49 @@ export function initClientErrorHandlers(): void {
 		});
 	});
 
+	originalConsoleError = console.error;
+	console.error = (...args: unknown[]) => {
+		const message = formatConsoleArgs(args);
+		const errorArg = args.find((arg) => arg instanceof Error);
+
+		sendToServer(
+			formatLogEntry("error", message, {
+				type: "console.error",
+				error: errorArg,
+			}),
+		);
+
+		originalConsoleError?.apply(console, args);
+	};
+
+	originalConsoleWarn = console.warn;
+	console.warn = (...args: unknown[]) => {
+		const message = formatConsoleArgs(args);
+
+		sendToServer(
+			formatLogEntry("warn", message, {
+				type: "console.warn",
+			}),
+		);
+
+		originalConsoleWarn?.apply(console, args);
+	};
+
 	globalErrorHandlersInitialized = true;
+}
+
+export function resetClientErrorHandlers(): void {
+	if (originalConsoleError) {
+		console.error = originalConsoleError;
+		originalConsoleError = null;
+	}
+	if (originalConsoleWarn) {
+		console.warn = originalConsoleWarn;
+		originalConsoleWarn = null;
+	}
+	globalErrorHandlersInitialized = false;
+}
+
+export function isClientErrorHandlersInitialized(): boolean {
+	return globalErrorHandlersInitialized;
 }

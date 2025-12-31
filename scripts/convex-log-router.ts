@@ -31,6 +31,8 @@ type CleanLogEntry = {
 	[key: string]: unknown;
 };
 
+const ALLOWED_FILE_LEVELS = new Set(["warn", "error", "fatal"]);
+
 async function processLine(line: string, stream: "stdout" | "stderr"): Promise<void> {
 	if (line.includes(LOG_MARKER)) {
 		const jsonMatch = line.match(/\{[^{}]*"marker"\s*:\s*"__VINCI_LOG__"[^{}]*\}/);
@@ -38,7 +40,11 @@ async function processLine(line: string, stream: "stdout" | "stderr"): Promise<v
 			try {
 				const logEntry = JSON.parse(jsonMatch[0]) as CleanLogEntry & { marker: string };
 				const { marker: _marker, ...cleanEntry } = logEntry;
-				await appendFile(getLogFilePath(), `${JSON.stringify(cleanEntry)}\n`);
+
+				// Only write warn/error/fatal to file
+				if (ALLOWED_FILE_LEVELS.has(cleanEntry.level)) {
+					await appendFile(getLogFilePath(), `${JSON.stringify(cleanEntry)}\n`);
+				}
 
 				const levelColors: Record<string, string> = {
 					trace: "\x1b[90m",

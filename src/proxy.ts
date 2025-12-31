@@ -4,7 +4,7 @@ import { createNodeLogger } from "@/lib/logging/logger-node";
 import { generateTraceId, TRACE_ID_COOKIE, TRACE_ID_HEADER } from "@/lib/logging/trace";
 
 const logger = createNodeLogger({
-	level: process.env.LOG_LEVEL ?? "info",
+	level: process.env.LOG_LEVEL ?? "warn",
 	logDir: process.env.LOG_DIR ?? ".logs",
 	silent: process.env.LOG_SILENT === "true",
 });

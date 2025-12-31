@@ -4,7 +4,7 @@ import { createLogger } from "@/lib/logging/logger";
 import { getTraceIdFromHeaders } from "@/lib/logging/trace";
 
 const logger = createLogger({
-	level: process.env.LOG_LEVEL ?? "info",
+	level: process.env.LOG_LEVEL ?? "warn",
 	logDir: process.env.LOG_DIR ?? ".logs",
 	silent: process.env.LOG_SILENT === "true",
 });

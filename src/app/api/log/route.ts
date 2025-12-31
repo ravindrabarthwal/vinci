@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getNodeLogger } from "@/lib/logging/logger-node";
 
+const isDevelopment = process.env.NODE_ENV === "development";
+
 const logger = getNodeLogger({
 	level: "warn",
 	logDir: process.env.LOG_DIR ?? ".logs",
@@ -26,6 +28,10 @@ type ClientLogPayload = {
 const ALLOWED_LEVELS = new Set(["warn", "error", "fatal"]);
 
 export async function POST(request: NextRequest) {
+	if (!isDevelopment) {
+		return NextResponse.json({ error: "Not found" }, { status: 404 });
+	}
+
 	try {
 		const payload = (await request.json()) as ClientLogPayload;
 
