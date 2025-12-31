@@ -10,7 +10,7 @@ import authConfig from "../auth.config";
 import authSchema from "../betterAuth/schema";
 import { createConvexLogger } from "./log";
 
-const logger = createConvexLogger({ module: "auth-options" });
+const logger = createConvexLogger({ module: "auth_options" });
 
 export const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
 

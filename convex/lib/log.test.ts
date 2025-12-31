@@ -19,31 +19,31 @@ describe("Convex Logger", () => {
 	});
 
 	describe("createConvexLogger", () => {
-		it("#given createConvexLogger called #when info logged #then outputs JSON with LOG_MARKER", () => {
+		it("#given createConvexLogger called #when warn logged #then outputs JSON with LOG_MARKER", () => {
 			// #given - create logger
 			const logger = createConvexLogger();
 
-			// #when - log info message
-			logger.info("Test message");
+			// #when - log warn message
+			logger.warn("Test message");
 
-			// #then - console.info called with JSON containing marker
-			expect(consoleInfoSpy).toHaveBeenCalledOnce();
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			// #then - console.warn called with JSON containing marker
+			expect(consoleWarnSpy).toHaveBeenCalledOnce();
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
 			expect(output.marker).toBe(LOG_MARKER);
 			expect(output.msg).toBe("Test message");
-			expect(output.level).toBe("info");
+			expect(output.level).toBe("warn");
 			expect(output.service).toBe("vinci-convex");
 		});
 
-		it("#given logger with bindings #when logged #then includes bindings in output", () => {
+		it("#given logger with bindings #when warn logged #then includes bindings in output", () => {
 			// #given - logger with traceId binding
 			const logger = createConvexLogger({ traceId: "trace-123" });
 
 			// #when - log message
-			logger.info("Request processed");
+			logger.warn("Request processed");
 
 			// #then - output includes binding
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
 			expect(output.traceId).toBe("trace-123");
 		});
 
@@ -52,10 +52,10 @@ describe("Convex Logger", () => {
 			const logger = createConvexLogger({ userId: "user-1" });
 
 			// #when - log with additional context
-			logger.info("Action completed", { action: "create" });
+			logger.error("Action completed", { action: "create" });
 
 			// #then - output has both binding and context
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			const output = JSON.parse(consoleErrorSpy.mock.calls[0][0] as string);
 			expect(output.userId).toBe("user-1");
 			expect(output.action).toBe("create");
 		});
@@ -65,39 +65,46 @@ describe("Convex Logger", () => {
 			const logger = createConvexLogger({ traceId: "original" });
 
 			// #when - log with different traceId
-			logger.info("Message", { traceId: "override" });
+			logger.error("Message", { traceId: "override" });
 
 			// #then - override wins
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			const output = JSON.parse(consoleErrorSpy.mock.calls[0][0] as string);
 			expect(output.traceId).toBe("override");
 		});
 	});
 
 	describe("Log Levels", () => {
-		it("#given logger #when trace called #then uses console.debug", () => {
+		it("#given logger #when trace called #then does not output (silenced)", () => {
 			// #given - logger
 			const logger = createConvexLogger();
 
 			// #when - trace
 			logger.trace("Trace message");
 
-			// #then - console.debug called
-			expect(consoleDebugSpy).toHaveBeenCalledOnce();
-			const output = JSON.parse(consoleDebugSpy.mock.calls[0][0] as string);
-			expect(output.level).toBe("trace");
+			// #then - console.debug NOT called (silenced for trace/debug/info)
+			expect(consoleDebugSpy).not.toHaveBeenCalled();
 		});
 
-		it("#given logger #when debug called #then uses console.debug", () => {
+		it("#given logger #when debug called #then does not output (silenced)", () => {
 			// #given - logger
 			const logger = createConvexLogger();
 
 			// #when - debug
 			logger.debug("Debug message");
 
-			// #then - console.debug called
-			expect(consoleDebugSpy).toHaveBeenCalledOnce();
-			const output = JSON.parse(consoleDebugSpy.mock.calls[0][0] as string);
-			expect(output.level).toBe("debug");
+			// #then - console.debug NOT called (silenced for trace/debug/info)
+			expect(consoleDebugSpy).not.toHaveBeenCalled();
+		});
+
+		it("#given logger #when info called #then does not output (silenced)", () => {
+			// #given - logger
+			const logger = createConvexLogger();
+
+			// #when - info
+			logger.info("Info message");
+
+			// #then - console.info NOT called (silenced for trace/debug/info)
+			expect(consoleInfoSpy).not.toHaveBeenCalled();
 		});
 
 		it("#given logger #when warn called #then uses console.warn", () => {
@@ -141,17 +148,26 @@ describe("Convex Logger", () => {
 	});
 
 	describe("convexLog helper", () => {
-		it("#given convexLog called #when level is info #then outputs correctly", () => {
+		it("#given convexLog called #when level is warn #then outputs correctly", () => {
 			// #given - convexLog function available
-			// #when - call with info level
-			convexLog("info", "Helper function test", { requestId: "req-1" });
+			// #when - call with warn level
+			convexLog("warn", "Helper function test", { requestId: "req-1" });
 
 			// #then - outputs correct JSON
-			expect(consoleInfoSpy).toHaveBeenCalledOnce();
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			expect(consoleWarnSpy).toHaveBeenCalledOnce();
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
 			expect(output.msg).toBe("Helper function test");
 			expect(output.requestId).toBe("req-1");
 			expect(output.marker).toBe(LOG_MARKER);
+		});
+
+		it("#given convexLog called #when level is info #then does not output (silenced)", () => {
+			// #given - convexLog function available
+			// #when - call with info level
+			convexLog("info", "Silenced message", { requestId: "req-1" });
+
+			// #then - console.info NOT called
+			expect(consoleInfoSpy).not.toHaveBeenCalled();
 		});
 	});
 
@@ -160,11 +176,11 @@ describe("Convex Logger", () => {
 			// #given - logger
 			const logger = createConvexLogger();
 
-			// #when - log message
-			logger.info("Structure test");
+			// #when - log message (using warn since info is silenced)
+			logger.warn("Structure test");
 
 			// #then - has all required fields
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
 			expect(output).toHaveProperty("marker");
 			expect(output).toHaveProperty("level");
 			expect(output).toHaveProperty("msg");
@@ -177,11 +193,11 @@ describe("Convex Logger", () => {
 			const logger = createConvexLogger();
 			const before = Date.now();
 
-			// #when - log message
-			logger.info("Time test");
+			// #when - log message (using warn since info is silenced)
+			logger.warn("Time test");
 
 			// #then - time is valid timestamp
-			const output = JSON.parse(consoleInfoSpy.mock.calls[0][0] as string);
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
 			const after = Date.now();
 			expect(output.time).toBeGreaterThanOrEqual(before);
 			expect(output.time).toBeLessThanOrEqual(after);

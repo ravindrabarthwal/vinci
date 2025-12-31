@@ -24,7 +24,8 @@
 		"playwright:install": "playwright install",
 		"logs:clear": "rm -rf .logs/*.jsonl",
 		"logs:tail:next": "tail -f .logs/next-*.jsonl | bunx pino-pretty",
-		"logs:tail:convex": "tail -f .logs/convex-*.jsonl"
+		"logs:tail:convex": "tail -f .logs/convex-*.jsonl",
+		"kill:all": "lsof -ti :3000,:3210,:6790 | xargs kill -9 2>/dev/null || true"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.0.0",

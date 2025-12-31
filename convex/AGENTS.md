@@ -5,7 +5,7 @@ convex/
 ├── _generated/           # Auto-generated (DO NOT EDIT)
 ├── betterAuth/           # Better Auth component (managed by library)
 ├── lib/                  # Shared utilities and config
-│   ├── auth-options.ts   # Auth config (breaks circular deps)
+│   ├── auth_options.ts   # Auth config (breaks circular deps)
 │   └── log.ts            # Logger
 ├── model/                # Business logic helpers (thin API, thick model)
 │   ├── auth.ts           # Auth helpers: getAuthenticatedUser, isAuthenticated

@@ -1,3 +1,8 @@
+export {
+	initGlobalErrorHandlers,
+	isGlobalHandlersInitialized,
+	resetGlobalErrorHandlers,
+} from "./global-handlers";
 export { createLogger, createRequestLogger, getLogger, resetLogger } from "./logger";
 export { clientLogger, createClientLogger } from "./logger-client";
 export { createEdgeLogger, type EdgeLogger, edgeLogger } from "./logger-edge";

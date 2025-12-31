@@ -1,5 +1,5 @@
 import { query } from "./_generated/server";
-import { authComponent, createAuth, createAuthOptions } from "./lib/auth-options";
+import { authComponent, createAuth, createAuthOptions } from "./lib/auth_options";
 import { createConvexLogger } from "./lib/log";
 import { getAuthenticatedUser, isAuthenticated } from "./model/auth";
 

@@ -10,7 +10,10 @@
 
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
+import type * as lib_auth_options from "../lib/auth_options.js";
 import type * as lib_log from "../lib/log.js";
+import type * as model_auth from "../model/auth.js";
+import type * as model_organizations from "../model/organizations.js";
 import type * as organizations from "../organizations.js";
 
 import type {
@@ -22,7 +25,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
+  "lib/auth_options": typeof lib_auth_options;
   "lib/log": typeof lib_log;
+  "model/auth": typeof model_auth;
+  "model/organizations": typeof model_organizations;
   organizations: typeof organizations;
 }>;
 

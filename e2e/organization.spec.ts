@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 
-async function signUpAndNavigateToOrgNew(page: Page): Promise<boolean> {
+async function signUpAndNavigateToOrgNew(page: Page): Promise<void> {
 	const testUser = {
 		name: `Org Test ${Date.now()}`,
 		email: `org-test-${Date.now()}@example.com`,
@@ -14,25 +14,35 @@ async function signUpAndNavigateToOrgNew(page: Page): Promise<boolean> {
 	await page.getByRole("button", { name: /sign up/i }).click();
 
 	const errorSelector = 'div[class*="bg-destructive"]';
+	let errorShown = false;
+
 	try {
 		await Promise.race([
-			page.waitForURL(/\/(org\/new|dashboard)/, { timeout: 15000 }),
-			page.waitForSelector(errorSelector, { timeout: 15000 }),
+			page.waitForURL(/\/org\/new/, { timeout: 15000 }),
+			page.waitForSelector(errorSelector, { timeout: 15000 }).then(() => {
+				errorShown = true;
+			}),
 		]);
 	} catch {
-		return false;
+		await page.waitForLoadState("networkidle");
+	}
+
+	const currentUrl = page.url();
+
+	if (errorShown) {
+		const errorElement = page.locator(errorSelector);
+		const errorText = await errorElement.textContent();
+		expect(errorText).not.toContain("BETTER_AUTH_SECRET");
+		expect(errorText).not.toContain("default secret");
+		throw new Error(`Signup failed with auth error: ${errorText}`);
+	}
+
+	if (!currentUrl.includes("/org/new")) {
+		throw new Error(`Signup did not redirect to /org/new. Current URL: ${currentUrl}`);
 	}
 
 	await page.waitForLoadState("networkidle");
-
-	const currentUrl = page.url();
-	if (currentUrl.includes("/dashboard")) {
-		await page.goto("/org/new");
-		await page.waitForLoadState("networkidle");
-		return currentUrl.includes("/org/new");
-	}
-
-	return currentUrl.includes("/org/new");
+	expect(page.url()).toContain("/org/new");
 }
 
 test.describe("Organization Pages", () => {
@@ -61,9 +71,8 @@ test.describe("Organization Pages", () => {
 		test("#given authenticated user on create org form #when name is entered #then slug is auto-generated", async ({
 			page,
 		}) => {
-			// #given - sign up and navigate to create organization page
-			const authenticated = await signUpAndNavigateToOrgNew(page);
-			test.skip(!authenticated, "Backend unavailable - signup failed");
+			// #given - sign up and navigate to create organization page (throws on failure)
+			await signUpAndNavigateToOrgNew(page);
 
 			// #when - enter organization name
 			const nameInput = page.getByLabel(/organization name/i);
@@ -78,9 +87,8 @@ test.describe("Organization Pages", () => {
 		test("#given authenticated user on create org form #when empty #then submit button is disabled", async ({
 			page,
 		}) => {
-			// #given - sign up and navigate to create organization page
-			const authenticated = await signUpAndNavigateToOrgNew(page);
-			test.skip(!authenticated, "Backend unavailable - signup failed");
+			// #given - sign up and navigate to create organization page (throws on failure)
+			await signUpAndNavigateToOrgNew(page);
 
 			// #when - form is empty (default state after navigation)
 			// #then - submit button should be disabled
@@ -124,34 +132,44 @@ test.describe("Organization Flow Integration", () => {
 	test("#given new user signs up #when signup succeeds #then redirects to create organization", async ({
 		page,
 	}) => {
-		// #given - unique test user
 		const testUser = {
 			name: `Org Test ${Date.now()}`,
 			email: `org-test-${Date.now()}@example.com`,
 			password: "TestPassword123!",
 		};
 
-		// #when - sign up
 		await page.goto("/signup");
 		await page.getByLabel(/name/i).fill(testUser.name);
 		await page.getByLabel(/email/i).fill(testUser.email);
 		await page.getByLabel(/password/i).fill(testUser.password);
 		await page.getByRole("button", { name: /sign up/i }).click();
 
-		// #then - should redirect to org/new (or show error)
 		const errorSelector = 'div[class*="bg-destructive"]';
-		await Promise.race([
-			page.waitForURL(/\/(org\/new|dashboard)/, { timeout: 10000 }),
-			page.waitForSelector(errorSelector, { timeout: 10000 }),
-		]);
+		let errorShown = false;
 
-		await page.waitForLoadState("networkidle");
+		try {
+			await Promise.race([
+				page.waitForURL(/\/org\/new/, { timeout: 15000 }),
+				page.waitForSelector(errorSelector, { timeout: 15000 }).then(() => {
+					errorShown = true;
+				}),
+			]);
+		} catch {
+			await page.waitForLoadState("networkidle");
+		}
 
 		const currentUrl = page.url();
+
 		if (currentUrl.includes("/org/new")) {
 			await expect(page.getByRole("heading", { name: /create organization/i })).toBeVisible();
-		} else if (currentUrl.includes("/dashboard")) {
-			await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible();
+		} else if (errorShown) {
+			const errorElement = page.locator(errorSelector);
+			const errorText = await errorElement.textContent();
+			expect(errorText).not.toContain("BETTER_AUTH_SECRET");
+			expect(errorText).not.toContain("default secret");
+			expect(errorText).not.toContain("environment variable");
+		} else {
+			expect.soft(currentUrl).toMatch(/\/org\/new/);
 		}
 	});
 });

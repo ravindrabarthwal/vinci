@@ -46,10 +46,7 @@ function createLogMethod(level: LogLevel, bindings: LogContext) {
 		switch (level) {
 			case "trace":
 			case "debug":
-				console.debug(output);
-				break;
 			case "info":
-				console.info(output);
 				break;
 			case "warn":
 				console.warn(output);
