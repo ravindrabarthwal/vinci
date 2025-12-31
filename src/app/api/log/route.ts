@@ -66,9 +66,13 @@ export async function POST(request: NextRequest) {
 				break;
 		}
 
+		// Flush to ensure log is written to file immediately
+		logger.flush();
+
 		return NextResponse.json({ success: true }, { status: 200 });
 	} catch {
 		logger.error({ source: "client", parseError: true }, "Failed to parse client log payload");
+		logger.flush();
 		return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
 	}
 }
