@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -14,15 +14,34 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signUp } from "@/lib/auth-client";
+import { signUp, useSession } from "@/lib/auth-client";
 
 export default function SignupPage() {
 	const router = useRouter();
+	const { data: session, isPending: isSessionPending } = useSession();
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
+
+	useEffect(() => {
+		if (!isSessionPending && session) {
+			router.push("/dashboard");
+		}
+	}, [session, isSessionPending, router]);
+
+	if (isSessionPending) {
+		return (
+			<div className="flex min-h-screen items-center justify-center">
+				<p className="text-muted-foreground">Loading...</p>
+			</div>
+		);
+	}
+
+	if (session) {
+		return null;
+	}
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
