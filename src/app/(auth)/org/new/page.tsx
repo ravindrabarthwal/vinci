@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,12 @@ export default function CreateOrganizationPage() {
 	const [isSlugManual, setIsSlugManual] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!sessionPending && !session) {
+			router.push("/login");
+		}
+	}, [session, sessionPending, router]);
 
 	const handleNameChange = (value: string) => {
 		setName(value);
@@ -70,7 +76,6 @@ export default function CreateOrganizationPage() {
 	}
 
 	if (!session) {
-		router.push("/login");
 		return null;
 	}
 

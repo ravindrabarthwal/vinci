@@ -11,7 +11,11 @@ import { signOut, useSession } from "@/lib/auth-client";
 export default function DashboardPage() {
 	const router = useRouter();
 	const { data: session, isPending } = useSession();
-	const { activeOrganization, hasOrganizations, isLoading: orgLoading } = useOrganization();
+	const orgContext = useOrganization();
+
+	const activeOrganization = orgContext?.activeOrganization;
+	const hasOrganizations = orgContext?.hasOrganizations ?? false;
+	const orgLoading = orgContext?.isLoading ?? true;
 
 	useEffect(() => {
 		if (!isPending && !session) {

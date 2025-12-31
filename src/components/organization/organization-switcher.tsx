@@ -14,7 +14,7 @@ import { organization } from "@/lib/auth-client";
 
 export function OrganizationSwitcher() {
 	const router = useRouter();
-	const { activeOrganization, organizations, isLoading } = useOrganization();
+	const orgContext = useOrganization();
 
 	const handleSwitchOrganization = async (orgId: string) => {
 		await organization.setActive({ organizationId: orgId });
@@ -27,6 +27,12 @@ export function OrganizationSwitcher() {
 	const handleManageOrganization = () => {
 		router.push("/org/settings");
 	};
+
+	if (!orgContext) {
+		return null;
+	}
+
+	const { activeOrganization, organizations, isLoading } = orgContext;
 
 	if (isLoading) {
 		return (
@@ -44,7 +50,14 @@ export function OrganizationSwitcher() {
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger className="w-48 h-9 px-3 rounded-md border border-input bg-background text-sm flex items-center justify-between hover:bg-accent hover:text-accent-foreground">
+			<DropdownMenuTrigger
+				render={
+					<button
+						type="button"
+						className="w-48 h-9 px-3 rounded-md border border-input bg-background text-sm flex items-center justify-between hover:bg-accent hover:text-accent-foreground"
+					/>
+				}
+			>
 				<span className="truncate">{activeOrganization?.name ?? "Select Organization"}</span>
 				<span className="ml-2">▼</span>
 			</DropdownMenuTrigger>

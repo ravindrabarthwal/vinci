@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOrganization } from "@/components/providers/organization-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,10 @@ interface Invitation {
 export default function OrganizationSettingsPage() {
 	const router = useRouter();
 	const { data: session, isPending: sessionPending } = useSession();
-	const { activeOrganization, isLoading: orgLoading } = useOrganization();
+	const orgContext = useOrganization();
+
+	const activeOrganization = orgContext?.activeOrganization;
+	const orgLoading = orgContext?.isLoading ?? true;
 
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteRole, setInviteRole] = useState<MemberRole>("member");
@@ -42,6 +45,18 @@ export default function OrganizationSettingsPage() {
 	const [members, setMembers] = useState<Member[]>([]);
 	const [invitations, setInvitations] = useState<Invitation[]>([]);
 	const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
+	useEffect(() => {
+		if (!sessionPending && !session) {
+			router.push("/login");
+		}
+	}, [session, sessionPending, router]);
+
+	useEffect(() => {
+		if (!sessionPending && !orgLoading && session && !activeOrganization) {
+			router.push("/org/new");
+		}
+	}, [session, sessionPending, orgLoading, activeOrganization, router]);
 
 	const loadMembers = async () => {
 		if (!activeOrganization) return;
@@ -123,13 +138,7 @@ export default function OrganizationSettingsPage() {
 		);
 	}
 
-	if (!session) {
-		router.push("/login");
-		return null;
-	}
-
-	if (!activeOrganization) {
-		router.push("/org/new");
+	if (!session || !activeOrganization) {
 		return null;
 	}
 
