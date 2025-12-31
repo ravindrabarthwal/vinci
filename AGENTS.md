@@ -61,7 +61,7 @@ vinci/
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-- **npm/yarn**: Use bun exclusively
+- **npm/yarn/npx**: Use bun exclusively
 - **@types/node**: Use bun-types
 - **Year 2024**: NEVER use 2024 in code/prompts
 - **Rush completion**: Verify before marking done
@@ -80,67 +80,6 @@ Structured logging to `.logs/` directory for debugging. **Use this to verify fea
 |------|--------|--------|
 | `.logs/next-YYYY-MM-DD.jsonl` | Next.js API routes | JSONL (Pino) |
 | `.logs/convex-YYYY-MM-DD.jsonl` | Convex functions | JSONL (via log router) |
-
-### Adding Logging to New Features
-
-**Next.js API Route (Node.js runtime):**
-```typescript
-import { createLogger } from "@/lib/logging";
-import { getTraceIdFromHeaders } from "@/lib/logging/trace";
-
-const logger = createLogger({
-  level: process.env.LOG_LEVEL ?? "info",
-  logDir: process.env.LOG_DIR ?? ".logs",
-  silent: process.env.LOG_SILENT === "true",
-});
-
-export async function POST(request: NextRequest) {
-  const traceId = getTraceIdFromHeaders(request.headers);
-  
-  logger.info("Operation started", { traceId, userId, action: "create" });
-  
-  try {
-    // ... your code
-    logger.info("Operation completed", { traceId, result: "success" });
-  } catch (error) {
-    logger.error("Operation failed", {
-      traceId,
-      error: { name: error.name, message: error.message, stack: error.stack }
-    });
-    throw error;
-  }
-}
-```
-
-**Next.js Proxy (Node.js runtime - replaces middleware in Next.js 16+):**
-```typescript
-import { createNodeLogger } from "@/lib/logging/logger-node";
-
-const logger = createNodeLogger({
-  level: process.env.LOG_LEVEL ?? "info",
-  logDir: process.env.LOG_DIR ?? ".logs",
-  silent: process.env.LOG_SILENT === "true",
-});
-
-export function proxy(request: NextRequest) {
-  logger.info({ msg: "Request", path: request.nextUrl.pathname });
-}
-```
-
-**Convex Functions:**
-```typescript
-import { createConvexLogger } from "./lib/log";
-
-const logger = createConvexLogger({ module: "myModule" });
-
-export const myMutation = mutation({
-  handler: async (ctx, args) => {
-    logger.info("Mutation started", { userId: args.userId });
-    // ... your code
-    logger.info("Mutation completed", { resultId: result._id });
-  },
-});
-```
 
 ### Reading Logs for Debugging
 
@@ -224,9 +163,10 @@ it("#given X #when Y #then Z", () => {
 
 ### Creating a New Feature
 
+**ALWAYS treat tests are first class citizen. NEVER keep test optional**
 1. **Understand scope**: Read existing code in target location
 2. **Add logging**: Include structured logs at entry/exit/error points
-3. **Write tests first** (if applicable): Unit tests for logic, E2E for user flows
+3. **ALWAYS Write tests first** (if applicable): Unit tests for logic, E2E for user flows, convex tests
 4. **Implement feature**
 5. **Verify via logs**: Start servers, trigger feature, read `.logs/` files
 6. **Run all checks**:
@@ -234,31 +174,9 @@ it("#given X #when Y #then Z", () => {
    bun run lint && bun run typecheck && bun test && bun run test:convex
    ```
 
-### Critical Infrastructure Files (MANDATORY full test suite)
-
-Changes to these files affect the entire application. **NO EXCEPTIONS: ALWAYS run `bun run test:all` when touching these files, regardless of how "minor" the change seems.**
-
-| File/Directory | Why Full Testing Required |
-|----------------|---------------------------|
-| `next.config.ts` | Build behavior, bundling, routing - affects how entire app compiles and runs |
-| `src/proxy.ts` | Intercepts ALL requests - auth, tracing, headers. Silent failure = broken app |
-| `src/lib/logging/` | Debugging infrastructure - silent failures are the worst kind |
-| `src/lib/env.ts` | Startup validation - app won't run if broken |
-| `src/lib/auth-*.ts` | Authentication - security critical, affects all protected routes |
-| `tsconfig.json` | Type resolution affects entire codebase |
-| `biome.json` | Linting rules - can cause CI failures across all files |
-| `convex/auth.ts` | Backend auth - security critical |
-| `convex/http.ts` | API routing - breaks all external calls if misconfigured |
-| `convex/schema.ts` | Database schema - data integrity at stake |
-
-**⚠️ The rationalization trap:** "It's just a config change" or "I only renamed a function" are EXACTLY when bugs slip through. A 1-line change to `proxy.ts` can break authentication for every user. Lint + typecheck passing means NOTHING if runtime behavior is broken.
-
-**If you touched any file above → run `bun run test:all` → NO EXCEPTIONS.**
-
----
-
 ### Refactoring / Enhancement Checklist
 
+**ALWAYS treat tests are first class citizen. NEVER keep test optional**
 Before marking complete, **ALL must pass - NO EXCEPTIONS:**
 
 ```bash
@@ -277,15 +195,13 @@ bun run test:convex   # All tests pass
 
 # 5. E2E tests
 bun run test:e2e      # All tests pass
-# ⚠️ REQUIRED if: UI changed OR any Critical Infrastructure File touched
-# Skip ONLY if: pure backend logic change with no request flow impact
 ```
 
 **If tests fail after your changes:**
 - Fix the code to make tests pass, OR
 - Update tests if behavior intentionally changed (document why)
 
-**Never skip failing tests. Never delete tests to make them pass.**
+**NEVER skip failing tests. NEVER delete tests to make them pass. NEVER skips any test**
 
 ### Verification Checklist (Before Completion)
 
@@ -295,7 +211,7 @@ bun run test:e2e      # All tests pass
 - [ ] `bun run typecheck` passes
 - [ ] `bun test` passes (unit + component)
 - [ ] `bun run test:convex` passes
-- [ ] `bun run test:e2e` passes (if UI or Critical Infrastructure changed)
+- [ ] `bun run test:e2e`
 - [ ] Feature works manually (verified via logs or browser)
 - [ ] No `level: "error"` in `.logs/` during happy path
 
@@ -347,7 +263,6 @@ bun run logs:tail:convex  # Tail Convex logs
 
 ## NOTES
 
-- **Empty schema**: `convex/schema.ts` is placeholder - auth tables managed by better-auth component
 - **Proxy**: `src/proxy.ts` injects trace IDs for request correlation (Next.js 16+ uses proxy instead of middleware)
 - **Convex AGENTS.md**: Contains Convex-specific guidelines - read it for backend work
 - **Env validation**: `src/lib/env.ts` validates at startup - add new vars there

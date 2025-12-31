@@ -1,6 +1,19 @@
----
-applyTo: "**/*.ts,**/*.tsx,**/*.js,**/*.jsx"
----
+### Adding Logging to New Features
+
+**Convex Functions:**
+```typescript
+import { createConvexLogger } from "./lib/log";
+
+const logger = createConvexLogger({ module: "myModule" });
+
+export const myMutation = mutation({
+  handler: async (ctx, args) => {
+    logger.info("Mutation started", { userId: args.userId });
+    // ... your code
+    logger.info("Mutation completed", { resultId: result._id });
+  },
+});
+```
 
 # Convex guidelines
 ## Function guidelines
