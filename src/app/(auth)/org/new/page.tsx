@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { organization, useSession } from "@/lib/auth-client";
+import { organization } from "@/lib/auth-client";
 
 function generateSlug(name: string): string {
 	return name
@@ -17,18 +17,11 @@ function generateSlug(name: string): string {
 
 export default function CreateOrganizationPage() {
 	const router = useRouter();
-	const { data: session, isPending: sessionPending } = useSession();
 	const [name, setName] = useState("");
 	const [slug, setSlug] = useState("");
 	const [isSlugManual, setIsSlugManual] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (!sessionPending && !session) {
-			router.push("/login");
-		}
-	}, [session, sessionPending, router]);
 
 	const handleNameChange = (value: string) => {
 		setName(value);
@@ -66,18 +59,6 @@ export default function CreateOrganizationPage() {
 			setIsSubmitting(false);
 		}
 	};
-
-	if (sessionPending) {
-		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<p>Loading...</p>
-			</div>
-		);
-	}
-
-	if (!session) {
-		return null;
-	}
 
 	return (
 		<div className="flex min-h-screen items-center justify-center p-4">
