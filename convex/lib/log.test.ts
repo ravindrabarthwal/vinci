@@ -211,4 +211,87 @@ describe("Convex Logger", () => {
 			expect(LOG_MARKER).toBe("__VINCI_LOG__");
 		});
 	});
+
+	describe("child() method", () => {
+		it("#given logger #when child called with bindings #then child inherits parent bindings", () => {
+			// #given - parent logger with traceId
+			const parent = createConvexLogger({ traceId: "trace-parent" });
+
+			// #when - create child with additional binding
+			const child = parent.child({ requestId: "req-123" });
+			child.warn("Child message");
+
+			// #then - output has both parent and child bindings
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
+			expect(output.traceId).toBe("trace-parent");
+			expect(output.requestId).toBe("req-123");
+		});
+
+		it("#given parent logger #when child logs #then parent bindings not modified", () => {
+			// #given - parent logger
+			const parent = createConvexLogger({ traceId: "trace-parent" });
+
+			// #when - create child and both log
+			const child = parent.child({ requestId: "req-123" });
+			parent.warn("Parent message");
+			child.warn("Child message");
+
+			// #then - parent output doesn't have child binding
+			const parentOutput = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
+			const childOutput = JSON.parse(consoleWarnSpy.mock.calls[1][0] as string);
+
+			expect(parentOutput.traceId).toBe("trace-parent");
+			expect(parentOutput.requestId).toBeUndefined();
+			expect(childOutput.traceId).toBe("trace-parent");
+			expect(childOutput.requestId).toBe("req-123");
+		});
+
+		it("#given child logger #when child overrides parent binding #then child value wins", () => {
+			// #given - parent with traceId
+			const parent = createConvexLogger({ traceId: "parent-trace" });
+
+			// #when - child overrides traceId
+			const child = parent.child({ traceId: "child-trace" });
+			child.warn("Override test");
+
+			// #then - child traceId used
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
+			expect(output.traceId).toBe("child-trace");
+		});
+
+		it("#given nested children #when logging #then all bindings merged correctly", () => {
+			// #given - parent -> child -> grandchild
+			const parent = createConvexLogger({ level: "parent" });
+			const child = parent.child({ level: "child", childProp: "c" });
+			const grandchild = child.child({ level: "grandchild", grandProp: "g" });
+
+			// #when - grandchild logs
+			grandchild.warn("Nested test");
+
+			// #then - all bindings present, innermost overrides
+			const output = JSON.parse(consoleWarnSpy.mock.calls[0][0] as string);
+			expect(output.level).toBe("grandchild"); // Note: 'level' field is the log level, this tests custom prop shadowing
+			expect(output.childProp).toBe("c");
+			expect(output.grandProp).toBe("g");
+		});
+	});
+
+	describe("flush() method", () => {
+		it("#given logger #when flush called #then does not throw", () => {
+			// #given - logger
+			const logger = createConvexLogger();
+
+			// #when/#then - flush completes without error
+			expect(() => logger.flush()).not.toThrow();
+		});
+
+		it("#given child logger #when flush called #then does not throw", () => {
+			// #given - child logger
+			const parent = createConvexLogger({ traceId: "trace-1" });
+			const child = parent.child({ requestId: "req-1" });
+
+			// #when/#then - flush completes without error
+			expect(() => child.flush()).not.toThrow();
+		});
+	});
 });

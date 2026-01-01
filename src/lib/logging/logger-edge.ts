@@ -1,4 +1,4 @@
-import type { LogContext } from "./types";
+import type { LogContext, Logger } from "./types";
 
 type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -24,9 +24,10 @@ function formatLog(level: LogLevel, msg: string, context: LogContext): EdgeLogEn
 	};
 }
 
-function createLogMethod(level: LogLevel) {
+function createLogMethod(level: LogLevel, bindings: LogContext) {
 	return (msg: string, context: LogContext = {}) => {
-		const output = JSON.stringify(formatLog(level, msg, context));
+		const merged = { ...bindings, ...context };
+		const output = JSON.stringify(formatLog(level, msg, merged));
 
 		switch (level) {
 			case "trace":
@@ -47,24 +48,19 @@ function createLogMethod(level: LogLevel) {
 	};
 }
 
-export type EdgeLogger = {
-	trace: (msg: string, context?: LogContext) => void;
-	debug: (msg: string, context?: LogContext) => void;
-	info: (msg: string, context?: LogContext) => void;
-	warn: (msg: string, context?: LogContext) => void;
-	error: (msg: string, context?: LogContext) => void;
-	fatal: (msg: string, context?: LogContext) => void;
-};
-
-export function createEdgeLogger(): EdgeLogger {
+export function createEdgeLogger(bindings: LogContext = {}): Logger {
 	return {
-		trace: createLogMethod("trace"),
-		debug: createLogMethod("debug"),
-		info: createLogMethod("info"),
-		warn: createLogMethod("warn"),
-		error: createLogMethod("error"),
-		fatal: createLogMethod("fatal"),
+		trace: createLogMethod("trace", bindings),
+		debug: createLogMethod("debug", bindings),
+		info: createLogMethod("info", bindings),
+		warn: createLogMethod("warn", bindings),
+		error: createLogMethod("error", bindings),
+		fatal: createLogMethod("fatal", bindings),
+		child: (childBindings) => createEdgeLogger({ ...bindings, ...childBindings }),
+		flush: () => {},
 	};
 }
 
 export const edgeLogger = createEdgeLogger();
+
+export type EdgeLogger = Logger;
