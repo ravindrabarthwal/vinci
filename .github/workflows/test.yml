@@ -125,8 +125,10 @@ jobs:
         run: bunx playwright install-deps chromium
 
       - name: Setup Convex environment
+        env:
+          CONVEX_AGENT_MODE: anonymous
         run: |
-          # Start Convex dev server in background
+          # Start Convex dev server in background (non-interactive mode)
           bunx convex dev &
           CONVEX_PID=$!
           
@@ -160,6 +162,7 @@ jobs:
         run: bun run test:e2e
         env:
           CI: true
+          CONVEX_AGENT_MODE: anonymous
           NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
           NEXT_PUBLIC_CONVEX_SITE_URL: http://127.0.0.1:3211
           BETTER_AUTH_URL: http://localhost:3000
