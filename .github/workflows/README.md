@@ -1,14 +1,53 @@
-# Sisyphus Agent Workflow Setup
+# GitHub Actions Workflows
+
+This directory contains GitHub Actions workflows for the Vinci project.
+
+## Available Workflows
+
+### 1. Sisyphus Agent (`sisyphus-agent.yml`)
+
+AI agent that responds to GitHub issues and PRs when mentioned with `@sisyphus-agent`.
+
+### 2. Tests (`test.yml`)
+
+Automated test suite that runs on push/PR to main/master branches.
+
+**Triggers:**
+- Push to `main` or `master`
+- Pull requests targeting `main` or `master`
+- Manual trigger via `workflow_dispatch` (with test suite selection)
+
+**Jobs:**
+| Job | Command | Description |
+|-----|---------|-------------|
+| Unit & Component | `bun test` | Fast unit tests with happy-dom |
+| Convex Backend | `bun run test:convex` | Vitest with edge-runtime |
+| E2E | `bun run test:e2e` | Playwright browser tests |
+| Summary | - | Aggregates results into GitHub Step Summary |
+
+**Manual Trigger Options:**
+- `all` - Run all test suites (default)
+- `unit` - Only unit & component tests
+- `convex` - Only Convex backend tests
+- `e2e` - Only E2E tests
+
+**Artifacts:**
+- `playwright-report/` - HTML report (14 days retention)
+- `test-results/` - Raw test results (7 days retention)
+
+---
+
+## Sisyphus Agent Setup
 
 This workflow enables an AI agent to respond to GitHub issues and PRs when mentioned with `@sisyphus-agent`.
 
-## Prerequisites
+### Prerequisites
 
 - GitHub repository with Actions enabled
 - A GitHub account for the bot (or use your own account)
 - GitHub Copilot subscription with API access
 
-## Required Secrets
+### Required Secrets
 
 Configure these secrets in your repository settings (`Settings > Secrets and variables > Actions > Secrets`):
 
@@ -17,7 +56,7 @@ Configure these secrets in your repository settings (`Settings > Secrets and var
 | `GH_PAT` | GitHub Personal Access Token with `repo`, `workflow`, and `issues` permissions. This allows the bot to push commits, create PRs, and interact with issues. |
 | `OPENCODE_AUTH_JSON` | OpenCode authentication JSON. Copy from `~/.local/share/opencode/auth.json` after authenticating locally. See [Getting Auth JSON](#getting-opencode-auth-json) below. |
 
-## Required Variables
+### Required Variables
 
 Configure these variables in your repository settings (`Settings > Secrets and variables > Actions > Variables`):
 
@@ -26,7 +65,7 @@ Configure these variables in your repository settings (`Settings > Secrets and v
 | `GIT_USER_NAME` | Git commit author name | `sisyphus-agent` |
 | `GIT_USER_EMAIL` | Git commit author email | `sisyphus-agent@users.noreply.github.com` |
 
-## Creating the Personal Access Token (PAT)
+### Creating the Personal Access Token (PAT)
 
 1. Go to [GitHub Developer Settings > Tokens](https://github.com/settings/tokens)
 2. Click "Generate new token (classic)"
@@ -38,7 +77,7 @@ Configure these variables in your repository settings (`Settings > Secrets and v
 6. Copy the token immediately (you won't see it again)
 7. Add it as `GH_PAT` secret in your repository
 
-## Getting OpenCode Auth JSON
+### Getting OpenCode Auth JSON
 
 1. Install OpenCode locally: `curl -fsSL https://opencode.ai/install | bash`
 2. Run `opencode` and authenticate with GitHub Copilot when prompted
@@ -48,7 +87,7 @@ Configure these variables in your repository settings (`Settings > Secrets and v
    ```
 4. Add the entire JSON content as `OPENCODE_AUTH_JSON` secret in your repository
 
-## Usage
+### Usage
 
 Once configured, mention `@sisyphus-agent` in any issue or PR comment to invoke the agent:
 
@@ -68,7 +107,7 @@ The agent will:
 5. Report results back in the issue/PR comments
 6. Remove the working label and react with 👍 when done
 
-## Trigger Conditions
+### Trigger Conditions
 
 The workflow runs when:
 - Someone comments on an issue or PR mentioning `@sisyphus-agent`
@@ -77,24 +116,24 @@ The workflow runs when:
 
 You can also trigger it manually via `workflow_dispatch` in the Actions tab.
 
-## Customization
+### Customization
 
-### Change the Bot Username
+#### Change the Bot Username
 
 Edit the workflow file and replace all instances of `sisyphus-agent` with your preferred bot username.
 
-## Troubleshooting
+### Troubleshooting
 
-### Agent not responding
+#### Agent not responding
 - Check that the commenter has appropriate permissions (OWNER, MEMBER, or COLLABORATOR)
 - Verify all secrets and variables are configured correctly
 - Check the Actions tab for workflow run logs
 
-### Authentication errors
+#### Authentication errors
 - Ensure `GH_PAT` has the correct scopes
 - Verify `OPENCODE_AUTH_JSON` contains valid JSON from your local auth file
 - Re-authenticate locally and update the secret if tokens have expired
 
-### Push failures
+#### Push failures
 - Ensure `GH_PAT` has `repo` and `workflow` scopes
 - Check if branch protection rules are blocking pushes

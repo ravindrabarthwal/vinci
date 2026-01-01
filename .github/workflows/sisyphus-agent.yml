@@ -62,8 +62,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/bun.lock') }}
+
       - name: Install project dependencies
         run: bun install
+
+      - name: Install Playwright browsers
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            bunx playwright install --with-deps chromium
+          else
+            bunx playwright install-deps chromium
+          fi
 
       - name: Setup OpenCode with oh-my-opencode plugin
         env:
@@ -145,6 +160,14 @@ jobs:
           - Code changes = PR (never push main/master)
           - Setup: bun install first
           - Acknowledge immediately, report when done
+
+          ### Testing Commands Available
+          - Unit + Component tests: bun test
+          - Convex backend tests: bun run test:convex
+          - E2E tests (Playwright): bun run test:e2e (starts servers automatically)
+          - All tests: bun run test:all
+          - Lint: bun run lint
+          - Type check: bun run typecheck
           PROMPT_EOF
 
           PROMPT_APPEND=$(cat /tmp/prompt_append.txt)
@@ -227,6 +250,11 @@ jobs:
           CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
           REPO_NAME: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
+          NEXT_PUBLIC_CONVEX_SITE_URL: http://127.0.0.1:3211
+          BETTER_AUTH_SECRET: ci-secret-key-for-testing-min-32-chars-long
+          BETTER_AUTH_URL: http://localhost:3000
+          CONVEX_DEPLOYMENT: anonymous:anonymous-vinci
         run: |
           set -euo pipefail
           export PATH="$HOME/.opencode/bin:$PATH"
