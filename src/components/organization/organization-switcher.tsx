@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronsUpDown, Plus, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useOrganization } from "@/components/providers/organization-provider";
 import {
@@ -50,16 +51,14 @@ export function OrganizationSwitcher() {
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<button
-						type="button"
-						className="w-48 h-9 px-3 rounded-md border border-input bg-background text-sm flex items-center justify-between hover:bg-accent hover:text-accent-foreground"
-					/>
-				}
-			>
-				<span className="truncate">{activeOrganization?.name ?? "Select Organization"}</span>
-				<span className="ml-2">▼</span>
+			<DropdownMenuTrigger asChild>
+				<button
+					type="button"
+					className="w-48 h-9 px-3 rounded-md border border-input bg-background text-sm flex items-center justify-between hover:bg-accent hover:text-accent-foreground"
+				>
+					<span className="truncate">{activeOrganization?.name ?? "Select Organization"}</span>
+					<ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent className="w-48">
 				{orgList.length > 0 && (
@@ -79,10 +78,14 @@ export function OrganizationSwitcher() {
 				)}
 				{activeOrganization && (
 					<DropdownMenuItem onClick={handleManageOrganization}>
+						<Settings className="mr-2 size-4" />
 						Manage Organization
 					</DropdownMenuItem>
 				)}
-				<DropdownMenuItem onClick={handleCreateOrganization}>Create Organization</DropdownMenuItem>
+				<DropdownMenuItem onClick={handleCreateOrganization}>
+					<Plus className="mr-2 size-4" />
+					Create Organization
+				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
