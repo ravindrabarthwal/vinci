@@ -7,6 +7,7 @@
 		"dev:convex": "bun run scripts/convex-log-router.ts",
 		"dev:convex:raw": "convex dev",
 		"dev:all": "concurrently --kill-others-on-fail --names next,convex --prefix-colors blue,magenta \"bun run dev\" \"bun run dev:convex\"",
+		"dev:all:ci": "concurrently --kill-others-on-fail --names next,convex --prefix-colors blue,magenta \"bun run dev\" \"bun run dev:convex:raw\"",
 		"build": "next build",
 		"start": "next start",
 		"lint": "bunx biome check .",
