@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
 import { ErrorHandlerProvider } from "@/components/providers/error-handler-provider";
 import "./globals.css";
 
-const geistSans = Geist({
-	variable: "--font-geist-sans",
+const inter = Inter({
+	variable: "--font-inter",
 	subsets: ["latin"],
 });
 
@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
-			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+			<body className={`${inter.variable} ${geistMono.variable} antialiased`}>
 				<ErrorHandlerProvider>
 					<ConvexClientProvider>{children}</ConvexClientProvider>
 				</ErrorHandlerProvider>
