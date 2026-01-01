@@ -118,11 +118,15 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps
+        run: bunx playwright install --with-deps chromium
 
       - name: Install Playwright system dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps
+        run: bunx playwright install-deps chromium
+
+      - name: Set Convex environment variables
+        run: |
+          bunx convex env set BETTER_AUTH_SECRET "ci-secret-key-for-testing-min-32-chars-long"
 
       - name: Run E2E tests
         run: bun run test:e2e

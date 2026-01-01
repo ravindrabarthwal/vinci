@@ -80,6 +80,10 @@ jobs:
             bunx playwright install-deps chromium
           fi
 
+      - name: Set Convex environment variables
+        run: |
+          bunx convex env set BETTER_AUTH_SECRET "ci-secret-key-for-testing-min-32-chars-long"
+
       - name: Setup OpenCode with oh-my-opencode plugin
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
