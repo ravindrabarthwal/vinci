@@ -80,9 +80,37 @@ jobs:
             bunx playwright install-deps chromium
           fi
 
-      - name: Set Convex environment variables
+      - name: Setup Convex environment
         run: |
+          # Start Convex dev server in background
+          bunx convex dev &
+          CONVEX_PID=$!
+          
+          # Wait for Convex to be ready (check for the local backend)
+          echo "Waiting for Convex dev server to start..."
+          for i in {1..60}; do
+            if curl -s http://127.0.0.1:3210 > /dev/null 2>&1; then
+              echo "Convex dev server is ready!"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Timeout waiting for Convex dev server"
+              kill $CONVEX_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+          
+          # Set the BETTER_AUTH_SECRET in Convex local environment
           bunx convex env set BETTER_AUTH_SECRET "ci-secret-key-for-testing-min-32-chars-long"
+          
+          # Stop the background Convex dev server (env is persisted)
+          kill $CONVEX_PID 2>/dev/null || true
+          
+          # Small delay to ensure clean shutdown
+          sleep 2
+          
+          echo "Convex environment configured successfully"
 
       - name: Setup OpenCode with oh-my-opencode plugin
         env:
@@ -256,9 +284,7 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
           NEXT_PUBLIC_CONVEX_SITE_URL: http://127.0.0.1:3211
-          BETTER_AUTH_SECRET: ci-secret-key-for-testing-min-32-chars-long
           BETTER_AUTH_URL: http://localhost:3000
-          CONVEX_DEPLOYMENT: anonymous:anonymous-vinci
         run: |
           set -euo pipefail
           export PATH="$HOME/.opencode/bin:$PATH"
