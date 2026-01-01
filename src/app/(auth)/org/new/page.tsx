@@ -69,7 +69,7 @@ export default function CreateOrganizationPage() {
 
 	if (sessionPending) {
 		return (
-			<div className="flex min-h-screen items-center justify-center">
+			<div className="flex min-h-[50vh] items-center justify-center">
 				<p>Loading...</p>
 			</div>
 		);
@@ -80,7 +80,7 @@ export default function CreateOrganizationPage() {
 	}
 
 	return (
-		<div className="flex min-h-screen items-center justify-center p-4">
+		<div className="flex min-h-[50vh] items-center justify-center">
 			<Card className="w-full max-w-md">
 				<CardHeader>
 					<CardTitle>Create Organization</CardTitle>

@@ -2,7 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import { useActiveOrganization, useListOrganizations, useSession } from "@/lib/auth-client";
+import {
+	organization,
+	useActiveOrganization,
+	useListOrganizations,
+	useSession,
+} from "@/lib/auth-client";
 
 interface OrganizationContextValue {
 	activeOrganization: ReturnType<typeof useActiveOrganization>["data"];
@@ -101,6 +106,12 @@ function AuthenticatedOrganizationProvider({
 			router.push("/org/new");
 		}
 	}, [requireOrganization, needsOrganization, hasRedirected, router]);
+
+	useEffect(() => {
+		if (!isLoading && hasOrganizations && !activeOrganization && organizations?.[0]) {
+			organization.setActive({ organizationId: organizations[0].id });
+		}
+	}, [isLoading, hasOrganizations, activeOrganization, organizations]);
 
 	const value: OrganizationContextValue = useMemo(
 		() => ({
