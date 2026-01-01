@@ -38,6 +38,7 @@ jobs:
           gh auth status
 
       - name: Ensure tmux is available
+        if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           if ! command -v tmux >/dev/null 2>&1; then
@@ -68,9 +69,9 @@ jobs:
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
         run: |
+          set -euo pipefail
           export PATH="$HOME/.opencode/bin:$PATH"
 
-          # Install OpenCode
           if ! command -v opencode &>/dev/null; then
             echo "Installing OpenCode..."
             curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
@@ -86,24 +87,15 @@ jobs:
           fi
           opencode --version
 
-          # Create opencode config directory
           mkdir -p ~/.config/opencode
           mkdir -p ~/.local/share/opencode
 
-          # Create opencode.json with github-copilot provider and oh-my-opencode plugin
-          cat > ~/.config/opencode/opencode.json << 'OPENCODE_EOF'
-          {
+          jq -n '{
             "$schema": "https://opencode.ai/config.json",
-            "autoupdate": false,
-            "plugin": [
-              "oh-my-opencode"
-            ]
-          }
-          OPENCODE_EOF
+            "plugin": ["oh-my-opencode"]
+          }' > ~/.config/opencode/opencode.json
 
-          # Create oh-my-opencode.json configuration
-          cat > ~/.config/opencode/oh-my-opencode.json << 'OMO_EOF'
-          {
+          jq -n '{
             "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
             "agents": {
               "Sisyphus": { "model": "github-copilot/claude-opus-4.5" },
@@ -114,12 +106,10 @@ jobs:
               "document-writer": { "model": "github-copilot/claude-sonnet-4.5" },
               "multimodal-looker": { "model": "github-copilot/claude-sonnet-4.5" }
             }
-          }
-          OMO_EOF
+          }' > ~/.config/opencode/oh-my-opencode.json
 
-          # Append GitHub Actions context to Sisyphus agent prompt
           OMO_JSON=~/.config/opencode/oh-my-opencode.json
-          PROMPT_APPEND=$(cat << 'PROMPT_EOF'
+          cat > /tmp/prompt_append.txt <<'PROMPT_EOF'
 
           ## GitHub Actions Environment
 
@@ -131,46 +121,24 @@ jobs:
 
           ### Comment Formatting (CRITICAL)
 
-          **ALWAYS use heredoc syntax for comments containing code references, backticks, or multiline content:**
+          ALWAYS use heredoc syntax for comments containing code references, backticks, or multiline content:
 
           ```bash
           gh issue comment <number> --body "$(cat <<'EOF'
-          Your comment with `backticks` and code references preserved here.
+          Your comment with backticks and code references preserved here.
           Multiple lines work perfectly.
           EOF
           )"
           ```
 
-          **NEVER use direct quotes with backticks** (shell will interpret them as command substitution):
-          ```bash
-          # WRONG - backticks disappear:
-          gh issue comment 123 --body "text with `code`"
-          
-          # CORRECT - backticks preserved:
-          gh issue comment 123 --body "$(cat <<'EOF'
-          text with `code`
-          EOF
-          )"
-          ```
+          NEVER use direct quotes with backticks (shell will interpret them as command substitution).
 
           ### GitHub Markdown Rules (MUST FOLLOW)
 
-          **Code blocks MUST have EXACTLY 3 backticks and language identifier:**
-          - CORRECT: ` ```bash ` ... ` ``` `
-          - WRONG: ` ``` ` (no language), ` ```` ` (4 backticks), ` `` ` (2 backticks)
-          
-          **Every opening ` ``` ` MUST have a closing ` ``` ` on its own line:**
-          ```
-          ```bash
-          code here
-          ```
-          ```
-          
-          **NO trailing backticks or spaces after closing ` ``` `**
-          
-          **For inline code, use SINGLE backticks:** `code` not ```code```
-          
-          **Lists inside code blocks break rendering - avoid them or use plain text**
+          Code blocks MUST have EXACTLY 3 backticks and language identifier.
+          Every opening ``` MUST have a closing ``` on its own line.
+          NO trailing backticks or spaces after closing ```.
+          For inline code, use SINGLE backticks.
 
           ### Rules
           - EVERY response = GitHub comment (use heredoc for proper escaping)
@@ -178,16 +146,17 @@ jobs:
           - Setup: bun install first
           - Acknowledge immediately, report when done
           PROMPT_EOF
-          )
+
+          PROMPT_APPEND=$(cat /tmp/prompt_append.txt)
           jq --arg append "$PROMPT_APPEND" '.agents.Sisyphus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
 
-          # Setup OpenCode authentication (write auth.json directly)
-          mkdir -p ~/.local/share/opencode
           echo "$OPENCODE_AUTH_JSON" > ~/.local/share/opencode/auth.json
           chmod 600 ~/.local/share/opencode/auth.json
 
-          echo "OpenCode configuration:"
-          cat ~/.config/opencode/opencode.json
+          echo "=== opencode.json ==="
+          jq . ~/.config/opencode/opencode.json
+          echo "=== oh-my-opencode.json ==="
+          jq . ~/.config/opencode/oh-my-opencode.json
 
       - name: Collect Context
         id: context
@@ -249,7 +218,7 @@ jobs:
               --add-label "sisyphus: working" || true
           fi
 
-      - name: Run OpenCode with oh-my-opencode
+      - name: Run oh-my-opencode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           USER_COMMENT: ${{ steps.context.outputs.comment }}
@@ -259,36 +228,30 @@ jobs:
           REPO_NAME: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          set -euo pipefail
           export PATH="$HOME/.opencode/bin:$PATH"
 
-          PROMPT=$(cat <<'PROMPT_EOF'
-          Your username is @sisyphus-agent, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
+          cat > /tmp/prompt.txt <<PROMPT_EOF
+          Your username is @sisyphus-agent, mentioned by @${COMMENT_AUTHOR} in ${REPO_NAME}.
 
           ## Context
-          - Type: TYPE_PLACEHOLDER
-          - Number: #NUMBER_PLACEHOLDER
-          - Repository: REPO_PLACEHOLDER
-          - Default Branch: BRANCH_PLACEHOLDER
+          - Type: ${CONTEXT_TYPE}
+          - Number: #${CONTEXT_NUMBER}
+          - Repository: ${REPO_NAME}
+          - Default Branch: ${DEFAULT_BRANCH}
 
           ## User's Request
-          COMMENT_PLACEHOLDER
+          ${USER_COMMENT}
 
           ---
 
           Write everything using the todo tools.
-          Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessively then create a PR to `BRANCH_PLACEHOLDER` branch.
-          When done, report the result to the issue/PR with `gh issue comment NUMBER_PLACEHOLDER` or `gh pr comment NUMBER_PLACEHOLDER`.
+          Then investigate and satisfy the request. Only if user requested to you to work explicitly, then use plan agent to plan, todo obsessively then create a PR to \`${DEFAULT_BRANCH}\` branch.
+          When done, report the result to the issue/PR with \`gh issue comment ${CONTEXT_NUMBER}\` or \`gh pr comment ${CONTEXT_NUMBER}\`.
           PROMPT_EOF
-          )
 
-          PROMPT="${PROMPT//AUTHOR_PLACEHOLDER/$COMMENT_AUTHOR}"
-          PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
-          PROMPT="${PROMPT//TYPE_PLACEHOLDER/$CONTEXT_TYPE}"
-          PROMPT="${PROMPT//NUMBER_PLACEHOLDER/$CONTEXT_NUMBER}"
-          PROMPT="${PROMPT//BRANCH_PLACEHOLDER/$DEFAULT_BRANCH}"
-          PROMPT="${PROMPT//COMMENT_PLACEHOLDER/$USER_COMMENT}"
-
-          stdbuf -oL -eL opencode --prompt "$PROMPT"
+          PROMPT=$(cat /tmp/prompt.txt)
+          stdbuf -oL -eL bunx oh-my-opencode run "$PROMPT"
 
       - name: Push changes
         if: always()
