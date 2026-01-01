@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useOrganization } from "@/components/providers/organization-provider";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ interface Invitation {
 
 export default function OrganizationSettingsPage() {
 	const { data: session } = useSession();
+	const router = useRouter();
 	const orgContext = useOrganization();
 	const activeOrganization = orgContext?.activeOrganization;
 
@@ -108,7 +110,7 @@ export default function OrganizationSettingsPage() {
 
 		try {
 			await organization.leave({ organizationId: activeOrganization.id });
-			window.location.href = "/dashboard";
+			router.push("/dashboard");
 		} catch {
 			setInviteError("Failed to leave organization");
 		}

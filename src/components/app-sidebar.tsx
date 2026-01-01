@@ -2,7 +2,7 @@
 
 import { LayoutDashboardIcon, LogOutIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { OrganizationSwitcher } from "@/components/organization/organization-switcher";
 import {
 	Sidebar,
@@ -20,11 +20,12 @@ import { signOut, useSession } from "@/lib/auth-client";
 
 export function AppSidebar() {
 	const pathname = usePathname();
+	const router = useRouter();
 	const { data: session } = useSession();
 
 	const handleSignOut = async () => {
 		await signOut();
-		window.location.href = "/";
+		router.push("/");
 	};
 
 	return (
