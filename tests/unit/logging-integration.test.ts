@@ -165,4 +165,33 @@ describe("Logging - Integration Tests", () => {
 			expect(new Date(entry.time).toISOString()).toBe(entry.time);
 		}
 	});
+
+	it("#given sync destination #when log written #then immediately available on disk", () => {
+		// #given - fresh logger with sync destination
+		resetNodeLogger();
+		const syncTestDir = path.join(TEST_LOG_DIR, "sync-test");
+		if (fs.existsSync(syncTestDir)) {
+			fs.rmSync(syncTestDir, { recursive: true });
+		}
+
+		const logger = createNodeLogger({
+			level: "info",
+			logDir: syncTestDir,
+			silent: false,
+		});
+
+		const uniqueMessage = `Sync test ${Date.now()}`;
+
+		// #when - log without explicit flush (sync mode writes immediately)
+		logger.info({ marker: "sync-verify" }, uniqueMessage);
+
+		// #then - should be on disk immediately (no setTimeout needed)
+		const expectedFileName = `next-${getDateString()}.jsonl`;
+		const logFilePath = path.join(syncTestDir, expectedFileName);
+
+		expect(fs.existsSync(logFilePath)).toBe(true);
+		const content = fs.readFileSync(logFilePath, "utf-8");
+		expect(content).toContain(uniqueMessage);
+		expect(content).toContain("sync-verify");
+	});
 });

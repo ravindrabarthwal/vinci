@@ -43,7 +43,6 @@
 		"pino": "^10.1.0",
 		"react": "19.2.3",
 		"react-dom": "19.2.3",
-		"rotating-file-stream": "^3.2.7",
 		"tailwind-merge": "^3.4.0"
 	},
 	"devDependencies": {

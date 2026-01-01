@@ -5,6 +5,9 @@ import type { LogContext, Logger, LogLevel } from "./types";
 
 const SERVICE_NAME = "vinci-client";
 
+// Guards against duplicate server sends when console overrides are active
+let isInternalLogging = false;
+
 type ClientLogEntry = {
 	level: LogLevel;
 	msg: string;
@@ -70,21 +73,26 @@ function createClientLogMethod(level: LogLevel, bindings: LogContext = {}) {
 		const merged = { ...bindings, ...context };
 		const entry = formatLogEntry(level, msg, merged);
 
-		switch (level) {
-			case "trace":
-			case "debug":
-			case "info":
-				console.debug(JSON.stringify(entry));
-				break;
-			case "warn":
-				console.warn(JSON.stringify(entry));
-				sendToServer(entry);
-				break;
-			case "error":
-			case "fatal":
-				console.error(JSON.stringify(entry));
-				sendToServer(entry);
-				break;
+		isInternalLogging = true;
+		try {
+			switch (level) {
+				case "trace":
+				case "debug":
+				case "info":
+					console.debug(JSON.stringify(entry));
+					break;
+				case "warn":
+					console.warn(JSON.stringify(entry));
+					sendToServer(entry);
+					break;
+				case "error":
+				case "fatal":
+					console.error(JSON.stringify(entry));
+					sendToServer(entry);
+					break;
+			}
+		} finally {
+			isInternalLogging = false;
 		}
 	};
 }
@@ -147,6 +155,11 @@ export function initClientErrorHandlers(): void {
 
 	originalConsoleError = console.error;
 	console.error = (...args: unknown[]) => {
+		if (isInternalLogging) {
+			originalConsoleError?.apply(console, args);
+			return;
+		}
+
 		const message = formatConsoleArgs(args);
 		const errorArg = args.find((arg) => arg instanceof Error);
 
@@ -162,6 +175,11 @@ export function initClientErrorHandlers(): void {
 
 	originalConsoleWarn = console.warn;
 	console.warn = (...args: unknown[]) => {
+		if (isInternalLogging) {
+			originalConsoleWarn?.apply(console, args);
+			return;
+		}
+
 		const message = formatConsoleArgs(args);
 
 		sendToServer(

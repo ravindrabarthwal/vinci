@@ -22,6 +22,8 @@ type ConvexLogger = {
 	warn: (msg: string, context?: LogContext) => void;
 	error: (msg: string, context?: LogContext) => void;
 	fatal: (msg: string, context?: LogContext) => void;
+	child: (bindings: LogContext) => ConvexLogger;
+	flush: () => void;
 };
 
 export const LOG_MARKER = "__VINCI_LOG__";
@@ -67,6 +69,8 @@ export function createConvexLogger(bindings: LogContext = {}): ConvexLogger {
 		warn: createLogMethod("warn", bindings),
 		error: createLogMethod("error", bindings),
 		fatal: createLogMethod("fatal", bindings),
+		child: (childBindings) => createConvexLogger({ ...bindings, ...childBindings }),
+		flush: () => {},
 	};
 }
 
