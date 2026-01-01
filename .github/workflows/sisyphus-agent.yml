@@ -1,0 +1,334 @@
+name: Sisyphus Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Custom prompt"
+        required: false
+  issue_comment:
+    types: [created]
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.comment.body, '@sisyphus-agent') &&
+       github.event.comment.user.login != 'sisyphus-agent' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "${{ vars.GIT_USER_NAME }}"
+          git config user.email "${{ vars.GIT_USER_EMAIL }}"
+
+      - name: Authenticate gh CLI
+        run: |
+          echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+          gh auth status
+
+      - name: Ensure tmux is available
+        run: |
+          set -euo pipefail
+          if ! command -v tmux >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends tmux
+          fi
+          tmux -V
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install project dependencies
+        run: bun install
+
+      - name: Setup OpenCode with oh-my-opencode plugin
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          # Install OpenCode
+          if ! command -v opencode &>/dev/null; then
+            echo "Installing OpenCode..."
+            curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
+            if file /tmp/opencode-install.sh | grep -q "shell script\|text"; then
+              if ! bash /tmp/opencode-install.sh 2>&1; then
+                echo "Default installer failed, trying with pinned version..."
+                bash /tmp/opencode-install.sh --version 1.0.204
+              fi
+            else
+              echo "Download corrupted, trying direct install with pinned version..."
+              bash <(curl -fsSL https://opencode.ai/install) --version 1.0.204
+            fi
+          fi
+          opencode --version
+
+          # Create opencode config directory
+          mkdir -p ~/.config/opencode
+          mkdir -p ~/.local/share/opencode
+
+          # Create opencode.json with github-copilot provider and oh-my-opencode plugin
+          cat > ~/.config/opencode/opencode.json << 'OPENCODE_EOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "autoupdate": false,
+            "plugin": [
+              "oh-my-opencode"
+            ]
+          }
+          OPENCODE_EOF
+
+          # Create oh-my-opencode.json configuration
+          cat > ~/.config/opencode/oh-my-opencode.json << 'OMO_EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+            "agents": {
+              "Sisyphus": { "model": "github-copilot/claude-opus-4.5" },
+              "oracle": { "model": "github-copilot/gpt-5.2" },
+              "librarian": { "model": "github-copilot/claude-sonnet-4.5" },
+              "explore": { "model": "github-copilot/claude-sonnet-4.5" },
+              "frontend-ui-ux-engineer": { "model": "github-copilot/claude-sonnet-4.5" },
+              "document-writer": { "model": "github-copilot/claude-sonnet-4.5" },
+              "multimodal-looker": { "model": "github-copilot/claude-sonnet-4.5" }
+            }
+          }
+          OMO_EOF
+
+          # Append GitHub Actions context to Sisyphus agent prompt
+          OMO_JSON=~/.config/opencode/oh-my-opencode.json
+          PROMPT_APPEND=$(cat << 'PROMPT_EOF'
+
+          ## GitHub Actions Environment
+
+          You are running in GitHub Actions.
+
+          ### CRITICAL: GitHub Comments = Your ONLY Output
+
+          User CANNOT see console. Post everything via `gh issue comment` or `gh pr comment`.
+
+          ### Comment Formatting (CRITICAL)
+
+          **ALWAYS use heredoc syntax for comments containing code references, backticks, or multiline content:**
+
+          ```bash
+          gh issue comment <number> --body "$(cat <<'EOF'
+          Your comment with `backticks` and code references preserved here.
+          Multiple lines work perfectly.
+          EOF
+          )"
+          ```
+
+          **NEVER use direct quotes with backticks** (shell will interpret them as command substitution):
+          ```bash
+          # WRONG - backticks disappear:
+          gh issue comment 123 --body "text with `code`"
+          
+          # CORRECT - backticks preserved:
+          gh issue comment 123 --body "$(cat <<'EOF'
+          text with `code`
+          EOF
+          )"
+          ```
+
+          ### GitHub Markdown Rules (MUST FOLLOW)
+
+          **Code blocks MUST have EXACTLY 3 backticks and language identifier:**
+          - CORRECT: ` ```bash ` ... ` ``` `
+          - WRONG: ` ``` ` (no language), ` ```` ` (4 backticks), ` `` ` (2 backticks)
+          
+          **Every opening ` ``` ` MUST have a closing ` ``` ` on its own line:**
+          ```
+          ```bash
+          code here
+          ```
+          ```
+          
+          **NO trailing backticks or spaces after closing ` ``` `**
+          
+          **For inline code, use SINGLE backticks:** `code` not ```code```
+          
+          **Lists inside code blocks break rendering - avoid them or use plain text**
+
+          ### Rules
+          - EVERY response = GitHub comment (use heredoc for proper escaping)
+          - Code changes = PR (never push main/master)
+          - Setup: bun install first
+          - Acknowledge immediately, report when done
+          PROMPT_EOF
+          )
+          jq --arg append "$PROMPT_APPEND" '.agents.Sisyphus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+
+          # Setup OpenCode authentication (write auth.json directly)
+          mkdir -p ~/.local/share/opencode
+          echo "$OPENCODE_AUTH_JSON" > ~/.local/share/opencode/auth.json
+          chmod 600 ~/.local/share/opencode/auth.json
+
+          echo "OpenCode configuration:"
+          cat ~/.config/opencode/opencode.json
+
+      - name: Collect Context
+        id: context
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_ID_VAL: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            ISSUE_NUM="$ISSUE_NUMBER"
+            AUTHOR="$COMMENT_AUTHOR"
+            COMMENT_ID="$COMMENT_ID_VAL"
+
+            if gh api "repos/$REPO/issues/${ISSUE_NUM}" | jq -e '.pull_request' > /dev/null; then
+              echo "type=pr" >> $GITHUB_OUTPUT
+              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            else
+              echo "type=issue" >> $GITHUB_OUTPUT
+              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+          echo "comment<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Add eyes reaction
+        if: steps.context.outputs.comment_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+            -X POST -f content="eyes" || true
+
+      - name: Add working label
+        if: steps.context.outputs.number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh label create "sisyphus: working" \
+            --repo "${{ github.repository }}" \
+            --color "fcf2e1" \
+            --description "Sisyphus is currently working on this" \
+            --force || true
+          
+          if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
+            gh pr edit "${{ steps.context.outputs.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "sisyphus: working" || true
+          else
+            gh issue edit "${{ steps.context.outputs.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "sisyphus: working" || true
+          fi
+
+      - name: Run OpenCode with oh-my-opencode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          USER_COMMENT: ${{ steps.context.outputs.comment }}
+          COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
+          CONTEXT_TYPE: ${{ steps.context.outputs.type }}
+          CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
+          REPO_NAME: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          PROMPT=$(cat <<'PROMPT_EOF'
+          Your username is @sisyphus-agent, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
+
+          ## Context
+          - Type: TYPE_PLACEHOLDER
+          - Number: #NUMBER_PLACEHOLDER
+          - Repository: REPO_PLACEHOLDER
+          - Default Branch: BRANCH_PLACEHOLDER
+
+          ## User's Request
+          COMMENT_PLACEHOLDER
+
+          ---
+
+          Write everything using the todo tools.
+          Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessively then create a PR to `BRANCH_PLACEHOLDER` branch.
+          When done, report the result to the issue/PR with `gh issue comment NUMBER_PLACEHOLDER` or `gh pr comment NUMBER_PLACEHOLDER`.
+          PROMPT_EOF
+          )
+
+          PROMPT="${PROMPT//AUTHOR_PLACEHOLDER/$COMMENT_AUTHOR}"
+          PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
+          PROMPT="${PROMPT//TYPE_PLACEHOLDER/$CONTEXT_TYPE}"
+          PROMPT="${PROMPT//NUMBER_PLACEHOLDER/$CONTEXT_NUMBER}"
+          PROMPT="${PROMPT//BRANCH_PLACEHOLDER/$DEFAULT_BRANCH}"
+          PROMPT="${PROMPT//COMMENT_PLACEHOLDER/$USER_COMMENT}"
+
+          stdbuf -oL -eL opencode --prompt "$PROMPT"
+
+      - name: Push changes
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add -A
+            git commit -m "chore: changes by sisyphus-agent" || true
+          fi
+
+          BRANCH=$(git branch --show-current)
+          if [[ "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
+            git push origin "$BRANCH" || true
+          fi
+
+      - name: Update reaction and remove label
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -n "${{ steps.context.outputs.comment_id }}" ]]; then
+            REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+              --jq '.[] | select(.content == "eyes") | .id' | head -1)
+            if [[ -n "$REACTION_ID" ]]; then
+              gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
+            fi
+
+            gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+              -X POST -f content="+1" || true
+          fi
+
+          if [[ -n "${{ steps.context.outputs.number }}" ]]; then
+            if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
+              gh pr edit "${{ steps.context.outputs.number }}" \
+                --repo "${{ github.repository }}" \
+                --remove-label "sisyphus: working" || true
+            else
+              gh issue edit "${{ steps.context.outputs.number }}" \
+                --repo "${{ github.repository }}" \
+                --remove-label "sisyphus: working" || true
+            fi
+          fi
