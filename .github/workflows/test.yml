@@ -101,13 +101,15 @@ jobs:
         with:
           path: |
             ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          key: ${{ runner.os }}-bun-cache-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-bun-cache-
 
       - name: Install dependencies
-        run: bun install
+        run: |
+          # Force fresh install to avoid stale cached packages
+          rm -rf node_modules
+          bun install
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -126,6 +128,9 @@ jobs:
 
       - name: Create .env.local for E2E tests
         run: |
+          # Clear any cached build artifacts that might cause CSS resolution issues
+          rm -rf .next
+          
           echo "BETTER_AUTH_SECRET=ci-secret-key-for-testing-min-32-chars-long" > .env.local
           echo "BETTER_AUTH_URL=http://localhost:3000" >> .env.local
           echo "NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210" >> .env.local
