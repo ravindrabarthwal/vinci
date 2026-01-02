@@ -23,6 +23,8 @@ export default defineConfig({
 		command: process.env.CI ? "bun run dev:all:ci" : "bun run dev:all",
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
-		timeout: 120000, // Convex takes longer to start
+		timeout: 180000, // Convex local backend takes longer to start in CI
+		stdout: "pipe",
+		stderr: "pipe",
 	},
 });
