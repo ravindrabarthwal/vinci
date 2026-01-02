@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import schema from "./schema";
 // Use LOCAL betterAuth schema that includes organization tables
 import betterAuthSchema from "./betterAuth/schema";
+import schema from "./schema";
 
 export const modules = import.meta.glob("./**/!(*.*.*)*.*s");
 

@@ -1,8 +1,6 @@
-import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, components } from "./_generated/api";
-import schema from "./schema";
-import { createTestContext, modules } from "./test.setup";
+import { createTestContext } from "./test.setup";
 
 /**
  * Future edge case to consider:

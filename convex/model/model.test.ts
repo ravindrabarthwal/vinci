@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { components } from "../_generated/api";
 import { createTestContext } from "../test.setup";
-import { isAuthenticated } from "./auth";
 import type { AuthUser } from "./auth";
+import { isAuthenticated } from "./auth";
 
 const ONE_HOUR_MS = 3600000;
 

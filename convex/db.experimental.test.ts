@@ -106,8 +106,8 @@ describe("Database Operations (convex-test pattern demo)", () => {
 		});
 
 		expect(identity).not.toBeNull();
-		expect(identity!.name).toBe("Sarah");
-		expect(identity!.tokenIdentifier).toBeTypeOf("string");
+		expect(identity?.name).toBe("Sarah");
+		expect(identity?.tokenIdentifier).toBeTypeOf("string");
 	});
 
 	test("multiple users with isolated data via t.withIdentity", async () => {
@@ -119,11 +119,14 @@ describe("Database Operations (convex-test pattern demo)", () => {
 
 		await asSarah.run(async (ctx) => {
 			const identity = await ctx.auth.getUserIdentity();
+			if (!identity?.name || !identity.subject) {
+				throw new Error("Identity missing required fields");
+			}
 			await ctx.db.insert("user", {
-				name: identity!.name!,
+				name: identity.name,
 				email: "sarah@example.com",
 				emailVerified: true,
-				userId: identity!.subject,
+				userId: identity.subject,
 				createdAt: now,
 				updatedAt: now,
 			});
@@ -131,11 +134,14 @@ describe("Database Operations (convex-test pattern demo)", () => {
 
 		await asLee.run(async (ctx) => {
 			const identity = await ctx.auth.getUserIdentity();
+			if (!identity?.name || !identity.subject) {
+				throw new Error("Identity missing required fields");
+			}
 			await ctx.db.insert("user", {
-				name: identity!.name!,
+				name: identity.name,
 				email: "lee@example.com",
 				emailVerified: true,
-				userId: identity!.subject,
+				userId: identity.subject,
 				createdAt: now,
 				updatedAt: now,
 			});

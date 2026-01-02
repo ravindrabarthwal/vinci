@@ -4,7 +4,7 @@ import { ConvexClientProvider } from "@/components/providers/convex-client-provi
 import { ErrorHandlerProvider } from "@/components/providers/error-handler-provider";
 import "./globals.css";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistMono = Geist_Mono({
 	variable: "--font-geist-mono",
