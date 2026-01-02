@@ -16,6 +16,7 @@ Configure these secrets in your repository settings (`Settings > Secrets and var
 |--------|-------------|
 | `GH_PAT` | GitHub Personal Access Token with `repo`, `workflow`, and `issues` permissions. This allows the bot to push commits, create PRs, and interact with issues. |
 | `OPENCODE_AUTH_JSON` | OpenCode authentication JSON. Copy from `~/.local/share/opencode/auth.json` after authenticating locally. See [Getting Auth JSON](#getting-opencode-auth-json) below. |
+| `SONAR_TOKEN` | (Optional) SonarCloud API token for fetching code analysis reports. Generate at https://sonarcloud.io/account/security. Enables the agent to access quality gate status and issue details. |
 
 ## Required Variables
 
