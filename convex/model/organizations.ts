@@ -1,6 +1,7 @@
 import type { GenericQueryCtx } from "convex/server";
 import type { DataModel } from "../_generated/dataModel";
-import { authComponent, createAuth } from "../lib/auth_options";
+import { components } from "../_generated/api";
+import { authComponent } from "../lib/auth_options";
 
 type QueryCtx = GenericQueryCtx<DataModel>;
 
@@ -16,19 +17,38 @@ export type UserOrganizationsResult = {
 };
 
 export async function getUserOrganizations(ctx: QueryCtx): Promise<UserOrganizationsResult> {
-	const user = await authComponent.getAuthUser(ctx);
+	const user = await authComponent.safeGetAuthUser(ctx);
 	if (!user) {
 		return { user: null, organizations: [] };
 	}
 
-	const { auth, headers } = await authComponent.getAuth(createAuth, ctx);
-	const orgsResult = await auth.api.listOrganizations({ headers });
+	const membershipsResult = await ctx.runQuery(components.betterAuth.adapter.findMany, {
+		model: "member",
+		where: [{ field: "userId", value: user._id }],
+		paginationOpts: { numItems: 100, cursor: null },
+	});
 
-	const organizations = orgsResult.map((org) => ({
-		id: org.id,
-		name: org.name,
-		slug: org.slug,
-	}));
+	const memberships = membershipsResult.page;
+	if (memberships.length === 0) {
+		return { user, organizations: [] };
+	}
+
+	const organizationIds = memberships.map((m: { organizationId: string }) => m.organizationId);
+
+	const organizations: OrganizationInfo[] = [];
+	for (const orgId of organizationIds) {
+		const org = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+			model: "organization",
+			where: [{ field: "_id", value: orgId }],
+		});
+		if (org) {
+			organizations.push({
+				id: org._id as string,
+				name: org.name as string,
+				slug: org.slug as string,
+			});
+		}
+	}
 
 	return { user, organizations };
 }
