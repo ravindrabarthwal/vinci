@@ -130,6 +130,9 @@ jobs:
           echo "BETTER_AUTH_URL=http://localhost:3000" >> .env.local
           echo "NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210" >> .env.local
           echo "NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211" >> .env.local
+          # Pre-populate CONVEX_DEPLOYMENT to prevent Convex from modifying .env.local
+          # during startup (which triggers Next.js env reload and can cause race conditions)
+          echo "CONVEX_DEPLOYMENT=anonymous:anonymous-agent" >> .env.local
           cat .env.local
 
       - name: Run E2E tests
