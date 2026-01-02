@@ -4,11 +4,12 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --turbopack",
+		"dev:webpack": "next dev",
 		"dev:convex": "bun run scripts/convex-log-router.ts",
 		"dev:convex:raw": "convex dev",
 		"dev:convex:local": "convex dev --local",
 		"dev:all": "concurrently --kill-others-on-fail --names next,convex --prefix-colors blue,magenta \"bun run dev\" \"bun run dev:convex\"",
-		"dev:all:ci": "concurrently --kill-others-on-fail --names next,convex --prefix-colors blue,magenta \"bun run dev\" \"bun run dev:convex:local\"",
+		"dev:all:ci": "concurrently --kill-others-on-fail --names next,convex --prefix-colors blue,magenta \"bun run dev:webpack\" \"bun run dev:convex:local\"",
 		"build": "next build",
 		"start": "next start",
 		"lint": "bunx biome check .",
