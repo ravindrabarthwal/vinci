@@ -170,6 +170,27 @@ jobs:
           - Code changes = PR (never push main/master)
           - Setup: bun install first
           - Acknowledge immediately, report when done
+
+          ### SonarCloud Analysis (when needed)
+
+          If you need to fetch SonarCloud analysis details for this PR or the entire codebase:
+
+          ```bash
+          # For PR analysis (use PR number from context)
+          bun run scripts/pull-sonar-report.ts --pr <PR_NUMBER> --format detailed
+
+          # For branch analysis
+          bun run scripts/pull-sonar-report.ts --branch <BRANCH_NAME> --format detailed
+
+          # For main project analysis
+          bun run scripts/pull-sonar-report.ts --format detailed
+
+          # For JSON output (machine-readable)
+          bun run scripts/pull-sonar-report.ts --pr <PR_NUMBER> --format json
+          ```
+
+          The script requires SONAR_TOKEN environment variable (already configured in workflow).
+          Output includes: quality gate status, code metrics, and detailed issue list.
           PROMPT_EOF
 
           PROMPT_APPEND=$(cat /tmp/prompt_append.txt)
@@ -246,6 +267,7 @@ jobs:
       - name: Run oh-my-opencode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           USER_COMMENT: ${{ steps.context.outputs.comment }}
           COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
           CONTEXT_TYPE: ${{ steps.context.outputs.type }}
