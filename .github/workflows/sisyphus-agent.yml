@@ -241,6 +241,14 @@ jobs:
               --add-label "sisyphus: working" || true
           fi
 
+      - name: Create .env.local for tests
+        run: |
+          echo "BETTER_AUTH_SECRET=ci-secret-key-for-testing-min-32-chars-long" > .env.local
+          echo "BETTER_AUTH_URL=http://localhost:3000" >> .env.local
+          echo "NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210" >> .env.local
+          echo "NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211" >> .env.local
+          cat .env.local
+
       - name: Run oh-my-opencode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
