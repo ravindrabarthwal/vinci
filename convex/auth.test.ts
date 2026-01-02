@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-describe("Auth Environment Validation", () => {
+describe("Auth Module", () => {
 	const originalEnv = process.env;
 
 	beforeEach(() => {
@@ -12,40 +12,52 @@ describe("Auth Environment Validation", () => {
 		process.env = originalEnv;
 	});
 
-	it("#given BETTER_AUTH_SECRET is missing #when createAuth is called #then Better Auth handles validation", async () => {
-		// #given - BETTER_AUTH_SECRET is not set
-		delete process.env.BETTER_AUTH_SECRET;
+	describe("Environment Handling", () => {
+		test("loads module when BETTER_AUTH_SECRET is missing (validation deferred to Better Auth)", async () => {
+			delete process.env.BETTER_AUTH_SECRET;
 
-		// #when - auth module is imported
-		const authModule = await import("./auth");
+			const authModule = await import("./auth");
 
-		// #then - module loads successfully (secret validation deferred to Better Auth)
-		// The createAuthOptions function is exported for createApi to introspect schema
-		expect(authModule.createAuthOptions).toBeDefined();
-		expect(authModule.createAuth).toBeDefined();
+			expect(authModule.createAuthOptions).toBeDefined();
+			expect(authModule.createAuth).toBeDefined();
+		});
+
+		test("loads module when BETTER_AUTH_SECRET is empty string", async () => {
+			process.env.BETTER_AUTH_SECRET = "";
+
+			const authModule = await import("./auth");
+
+			expect(authModule.createAuthOptions).toBeDefined();
+			expect(authModule.createAuth).toBeDefined();
+		});
+
+		test("loads module when BETTER_AUTH_SECRET is properly set", async () => {
+			process.env.BETTER_AUTH_SECRET = "test-secret-at-least-32-characters-long";
+
+			const authModule = await import("./auth");
+
+			expect(authModule.createAuth).toBeDefined();
+			expect(typeof authModule.createAuth).toBe("function");
+		});
 	});
 
-	it("#given BETTER_AUTH_SECRET is empty string #when createAuth is called #then Better Auth handles validation", async () => {
-		// #given - BETTER_AUTH_SECRET is empty
-		process.env.BETTER_AUTH_SECRET = "";
+	describe("Module Exports", () => {
+		beforeEach(() => {
+			process.env.BETTER_AUTH_SECRET = "test-secret-at-least-32-characters-long";
+		});
 
-		// #when - auth module is imported
-		const authModule = await import("./auth");
+		test("exports createAuth function", async () => {
+			const authModule = await import("./auth");
 
-		// #then - module loads successfully (secret validation deferred to Better Auth)
-		expect(authModule.createAuthOptions).toBeDefined();
-		expect(authModule.createAuth).toBeDefined();
-	});
+			expect(authModule.createAuth).toBeDefined();
+			expect(typeof authModule.createAuth).toBe("function");
+		});
 
-	it("#given BETTER_AUTH_SECRET is set #when auth module loads #then exports createAuth function", async () => {
-		// #given - BETTER_AUTH_SECRET is properly set
-		process.env.BETTER_AUTH_SECRET = "test-secret-at-least-32-characters-long";
+		test("exports createAuthOptions function", async () => {
+			const authModule = await import("./auth");
 
-		// #when - auth module is imported
-		const authModule = await import("./auth");
-
-		// #then - should export createAuth function
-		expect(authModule.createAuth).toBeDefined();
-		expect(typeof authModule.createAuth).toBe("function");
+			expect(authModule.createAuthOptions).toBeDefined();
+			expect(typeof authModule.createAuthOptions).toBe("function");
+		});
 	});
 });

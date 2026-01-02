@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 
 describe("Auth Model", () => {
 	beforeAll(() => {
@@ -6,58 +6,60 @@ describe("Auth Model", () => {
 	});
 
 	describe("Module Exports", () => {
-		it("#given model/auth module #when imported #then exports getAuthenticatedUser", async () => {
-			// #given - model/auth module exists
-			// #when - module is imported
+		test("exports getAuthenticatedUser function", async () => {
 			const authModel = await import("./auth");
 
-			// #then - should export getAuthenticatedUser
 			expect(authModel.getAuthenticatedUser).toBeDefined();
 			expect(typeof authModel.getAuthenticatedUser).toBe("function");
 		});
 
-		it("#given model/auth module #when imported #then exports isAuthenticated", async () => {
-			// #given - model/auth module exists
-			// #when - module is imported
+		test("exports isAuthenticated function", async () => {
 			const authModel = await import("./auth");
 
-			// #then - should export isAuthenticated
 			expect(authModel.isAuthenticated).toBeDefined();
 			expect(typeof authModel.isAuthenticated).toBe("function");
 		});
 
-		it("#given model/auth module #when imported #then exports AuthUser type", async () => {
-			// #given - model/auth module exists
-			// #when - module is imported (type exports don't show at runtime but module should load)
+		test("exports expected keys", async () => {
 			const authModel = await import("./auth");
 
-			// #then - module loaded successfully with expected exports
 			expect(Object.keys(authModel)).toContain("getAuthenticatedUser");
 			expect(Object.keys(authModel)).toContain("isAuthenticated");
 		});
 	});
 
 	describe("isAuthenticated", () => {
-		it("#given null user #when isAuthenticated called #then returns false", async () => {
-			// #given - null user (getAuthUser returns null when not authenticated)
+		test("returns false for null user", async () => {
 			const { isAuthenticated } = await import("./auth");
 
-			// #when - check authentication
 			const result = isAuthenticated(null as never);
 
-			// #then - returns false
 			expect(result).toBe(false);
 		});
 
-		it("#given user object #when isAuthenticated called #then returns true", async () => {
-			// #given - mock user object
+		test("returns true for valid user object", async () => {
 			const { isAuthenticated } = await import("./auth");
 			const mockUser = { _id: "user123", email: "test@example.com" };
 
-			// #when - check authentication
 			const result = isAuthenticated(mockUser as never);
 
-			// #then - returns true
+			expect(result).toBe(true);
+		});
+
+		test("returns true for undefined (function only checks for null)", async () => {
+			const { isAuthenticated } = await import("./auth");
+
+			const result = isAuthenticated(undefined as never);
+
+			expect(result).toBe(true);
+		});
+
+		test("returns true for user with minimal fields", async () => {
+			const { isAuthenticated } = await import("./auth");
+			const mockUser = { _id: "user123" };
+
+			const result = isAuthenticated(mockUser as never);
+
 			expect(result).toBe(true);
 		});
 	});
@@ -69,34 +71,25 @@ describe("Organizations Model", () => {
 	});
 
 	describe("Module Exports", () => {
-		it("#given model/organizations module #when imported #then exports getUserOrganizations", async () => {
-			// #given - model/organizations module exists
-			// #when - module is imported
+		test("exports getUserOrganizations function", async () => {
 			const orgsModel = await import("./organizations");
 
-			// #then - should export getUserOrganizations
 			expect(orgsModel.getUserOrganizations).toBeDefined();
 			expect(typeof orgsModel.getUserOrganizations).toBe("function");
 		});
 
-		it("#given model/organizations module #when imported #then exports hasUserOrganizations", async () => {
-			// #given - model/organizations module exists
-			// #when - module is imported
+		test("exports hasUserOrganizations function", async () => {
 			const orgsModel = await import("./organizations");
 
-			// #then - should export hasUserOrganizations
 			expect(orgsModel.hasUserOrganizations).toBeDefined();
 			expect(typeof orgsModel.hasUserOrganizations).toBe("function");
 		});
 	});
 
 	describe("Type Exports", () => {
-		it("#given model/organizations module #when imported #then module loads successfully", async () => {
-			// #given - model/organizations module exists
-			// #when - module is imported
+		test("module loads successfully with expected function exports", async () => {
 			const orgsModel = await import("./organizations");
 
-			// #then - has expected function exports
 			expect(Object.keys(orgsModel)).toContain("getUserOrganizations");
 			expect(Object.keys(orgsModel)).toContain("hasUserOrganizations");
 		});

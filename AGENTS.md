@@ -57,10 +57,17 @@ vinci/
 
 ### Testing (Three Tiers)
 - **Unit tests**: `tests/unit/*.test.ts` → Bun test (pure logic, utilities)
-- **Convex tests**: `convex/*.test.ts` → Vitest in edge-runtime (backend)
+- **Convex tests**: `convex/*.test.ts` → Vitest in edge-runtime (backend) — **SEE `convex/TESTING.md`**
 - **E2E tests**: `e2e/` → Playwright (see e2e/AGENTS.md)
-- Unit tests: Use `#given #when #then` comments
-- E2E tests: User journey pattern (NOT BDD fragments)
+
+#### ⚠️ MANDATORY Test Style Rules:
+| Test Type | Style | Example |
+|-----------|-------|---------|
+| **Convex tests** | `describe`/`test` blocks with descriptive names | `test("returns empty array when no orgs exist")` |
+| **Unit tests** | `#given #when #then` comments inside test body | `// #given user is logged in` |
+| **E2E tests** | User journey pattern (NOT BDD fragments) | see `e2e/AGENTS.md` |
+
+**CRITICAL**: Convex tests MUST use standard Vitest `describe`/`test` patterns. Do NOT use `#given #when #then` comments in Convex tests — this is NOT the Convex-recommended style.
 
 ### Auth Flow
 - Client: `authClient` from `@/lib/auth-client` (React hooks)

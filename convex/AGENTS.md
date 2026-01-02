@@ -1,5 +1,9 @@
 # CONVEX BACKEND
 
+> **WRITING TESTS?** See **[TESTING.md](./TESTING.md)** for comprehensive testing guide with `convex-test` patterns.
+>
+> **MANDATORY**: Convex tests use standard `describe`/`test` blocks — NOT `#given #when #then` comments.
+
 ## OVERVIEW
 
 Convex functions with Better Auth integration. Organization multi-tenancy.
@@ -65,14 +69,43 @@ export const myQuery = query({
 
 ## TESTING
 
+> **📖 FULL GUIDE**: See **[TESTING.md](./TESTING.md)** for complete patterns and examples.
+
 ```bash
 bun run test:convex        # Run Convex tests
 bun run test:convex:watch  # Watch mode
 ```
 
-- Tests in `convex/*.test.ts`
-- Uses `convex-test` with edge-runtime environment
-- Setup in `test.setup.ts` mocks `convex/server`
+### ⚠️ MANDATORY Test Style
+
+| Rule | Requirement |
+|------|-------------|
+| **Structure** | Use `describe`/`test` blocks with descriptive names |
+| **Style** | Standard Vitest patterns — NO `#given #when #then` comments |
+| **Library** | Use `convex-test` with schema and modules |
+| **Reference** | https://docs.convex.dev/testing/convex-test |
+
+**Example (CORRECT)**:
+```typescript
+import { convexTest } from "convex-test";
+import { describe, expect, test } from "vitest";
+import schema from "./betterAuth/schema";
+import { modules } from "./test.setup";
+
+describe("Organizations", () => {
+  test("returns empty array when user has no organizations", async () => {
+    const t = convexTest(schema, modules);
+    const result = await t.query(api.organizations.listUserOrganizations);
+    expect(result).toEqual([]);
+  });
+});
+```
+
+**WRONG** (do NOT use in Convex tests):
+```typescript
+// ❌ Do NOT use #given #when #then in Convex tests
+it("#given no user #when query called #then returns empty", ...);
+```
 
 ## ANTI-PATTERNS
 

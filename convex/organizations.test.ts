@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 
 describe("Organizations Module", () => {
 	beforeAll(() => {
@@ -6,41 +6,29 @@ describe("Organizations Module", () => {
 	});
 
 	describe("Query Exports", () => {
-		it("#given organizations module #when imported #then exports hasOrganizations query", async () => {
-			// #given - organizations module exists
-			// #when - module is imported
+		test("exports hasOrganizations query", async () => {
 			const orgsModule = await import("./organizations");
 
-			// #then - should export hasOrganizations
 			expect(orgsModule.hasOrganizations).toBeDefined();
 		});
 
-		it("#given organizations module #when imported #then exports listUserOrganizations query", async () => {
-			// #given - organizations module exists
-			// #when - module is imported
+		test("exports listUserOrganizations query", async () => {
 			const orgsModule = await import("./organizations");
 
-			// #then - should export listUserOrganizations
 			expect(orgsModule.listUserOrganizations).toBeDefined();
 		});
 	});
 
 	describe("Query Types", () => {
-		it("#given hasOrganizations #when checked #then is a function (Convex query wrapper)", async () => {
-			// #given - hasOrganizations export
+		test("hasOrganizations is a function (Convex query wrapper)", async () => {
 			const { hasOrganizations } = await import("./organizations");
 
-			// #when - we check its type
-			// #then - should be a function (Convex wraps queries as callable)
 			expect(typeof hasOrganizations).toBe("function");
 		});
 
-		it("#given listUserOrganizations #when checked #then is a function (Convex query wrapper)", async () => {
-			// #given - listUserOrganizations export
+		test("listUserOrganizations is a function (Convex query wrapper)", async () => {
 			const { listUserOrganizations } = await import("./organizations");
 
-			// #when - we check its type
-			// #then - should be a function (Convex wraps queries as callable)
 			expect(typeof listUserOrganizations).toBe("function");
 		});
 	});
