@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useOrganization } from "@/components/providers/organization-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,12 +29,10 @@ interface Invitation {
 }
 
 export default function OrganizationSettingsPage() {
+	const { data: session } = useSession();
 	const router = useRouter();
-	const { data: session, isPending: sessionPending } = useSession();
 	const orgContext = useOrganization();
-
 	const activeOrganization = orgContext?.activeOrganization;
-	const orgLoading = orgContext?.isLoading ?? true;
 
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteRole, setInviteRole] = useState<MemberRole>("member");
@@ -45,18 +43,6 @@ export default function OrganizationSettingsPage() {
 	const [members, setMembers] = useState<Member[]>([]);
 	const [invitations, setInvitations] = useState<Invitation[]>([]);
 	const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-
-	useEffect(() => {
-		if (!sessionPending && !session) {
-			router.push("/login");
-		}
-	}, [session, sessionPending, router]);
-
-	useEffect(() => {
-		if (!sessionPending && !orgLoading && session && !activeOrganization) {
-			router.push("/org/new");
-		}
-	}, [session, sessionPending, orgLoading, activeOrganization, router]);
 
 	const loadMembers = async () => {
 		if (!activeOrganization) return;
@@ -130,14 +116,6 @@ export default function OrganizationSettingsPage() {
 		}
 	};
 
-	if (sessionPending || orgLoading) {
-		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<p>Loading...</p>
-			</div>
-		);
-	}
-
 	if (!session || !activeOrganization) {
 		return null;
 	}
@@ -147,15 +125,10 @@ export default function OrganizationSettingsPage() {
 	const isAdmin = currentMember?.role === "admin" || isOwner;
 
 	return (
-		<div className="container mx-auto max-w-4xl p-4 space-y-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-2xl font-bold">{activeOrganization.name}</h1>
-					<p className="text-muted-foreground">Organization Settings</p>
-				</div>
-				<Button variant="outline" onClick={() => router.push("/dashboard")}>
-					Back to Dashboard
-				</Button>
+		<div className="container mx-auto max-w-4xl space-y-6">
+			<div>
+				<h1 className="text-2xl font-bold">{activeOrganization.name}</h1>
+				<p className="text-muted-foreground">Organization Settings</p>
 			</div>
 
 			<Card>
