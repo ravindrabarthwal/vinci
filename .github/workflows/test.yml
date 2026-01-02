@@ -126,6 +126,16 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
 
+      - name: Create shadcn CSS shim for Tailwind v4 compatibility
+        run: |
+          # Workaround for Tailwind CSS v4 + shadcn CSS resolution issue
+          # The @tailwindcss/postcss plugin internally generates an import for
+          # 'shadcn/tailwind.css' which doesn't exist as a real package.
+          # Creating an empty shim allows CSS compilation to succeed.
+          # See: https://github.com/shadcn-ui/ui/issues/6522
+          mkdir -p node_modules/shadcn
+          echo "/* Empty shim for shadcn/tailwind.css resolution */" > node_modules/shadcn/tailwind.css
+
       - name: Create .env.local for E2E tests
         run: |
           # Clear any cached build artifacts that might cause CSS resolution issues
