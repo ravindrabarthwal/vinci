@@ -21,6 +21,9 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -32,12 +35,8 @@ jobs:
           git config user.name "${{ vars.GIT_USER_NAME }}"
           git config user.email "${{ vars.GIT_USER_EMAIL }}"
 
-      - name: Authenticate gh CLI
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          echo "$GH_TOKEN" | gh auth login --with-token
-          gh auth status
+      - name: Verify gh CLI auth
+        run: gh auth status
 
       - name: Ensure tmux is available
         if: runner.os == 'Linux'
@@ -209,7 +208,6 @@ jobs:
       - name: Collect Context
         id: context
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           EVENT_NAME: ${{ github.event_name }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
@@ -239,16 +237,12 @@ jobs:
 
       - name: Add eyes reaction
         if: steps.context.outputs.comment_id != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
             -X POST -f content="eyes" || true
 
       - name: Add working label
         if: steps.context.outputs.number != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           gh label create "sisyphus: working" \
             --repo "${{ github.repository }}" \
@@ -268,7 +262,6 @@ jobs:
 
       - name: Run oh-my-opencode
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           USER_COMMENT: ${{ steps.context.outputs.comment }}
           COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
@@ -304,8 +297,6 @@ jobs:
 
       - name: Push changes
         if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git add -A
@@ -319,8 +310,6 @@ jobs:
 
       - name: Update reaction and remove label
         if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           if [[ -n "${{ steps.context.outputs.comment_id }}" ]]; then
             REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
