@@ -30,7 +30,8 @@ function formatArgs(args: unknown[]): string {
 	return args
 		.map((arg) => {
 			if (arg instanceof Error) {
-				return `${arg.name}: ${arg.message}${arg.stack ? `\n${arg.stack}` : ""}`;
+				const stackTrace = arg.stack ? `\n${arg.stack}` : "";
+				return `${arg.name}: ${arg.message}${stackTrace}`;
 			}
 			if (typeof arg === "object") {
 				try {
