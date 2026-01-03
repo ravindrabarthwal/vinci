@@ -104,6 +104,7 @@ jobs:
       BETTER_AUTH_SECRET: ci-test-secret-key-minimum-32-characters-long
       BETTER_AUTH_URL: http://localhost:3000
       NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
+      NEXT_PUBLIC_CONVEX_SITE_URL: http://127.0.0.1:3210
       CONVEX_AGENT_MODE: anonymous
     steps:
       - uses: actions/checkout@v5
@@ -143,6 +144,7 @@ jobs:
           BETTER_AUTH_SECRET=ci-test-secret-key-minimum-32-characters-long
           BETTER_AUTH_URL=http://localhost:3000
           NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
+          NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3210
           EOF
 
       - name: Run E2E tests
@@ -153,6 +155,7 @@ jobs:
           BETTER_AUTH_SECRET: ci-test-secret-key-minimum-32-characters-long
           BETTER_AUTH_URL: http://localhost:3000
           NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
+          NEXT_PUBLIC_CONVEX_SITE_URL: http://127.0.0.1:3210
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
