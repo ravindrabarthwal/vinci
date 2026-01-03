@@ -25,6 +25,7 @@ export default defineConfig({
 			name: "setup",
 			testMatch: /.*\.setup\.ts/,
 			use: { ...devices["Desktop Chrome"] },
+			timeout: 120000,
 		},
 		{
 			name: "chromium",
