@@ -3,7 +3,35 @@ import { expect, test as setup } from "@playwright/test";
 
 const authFile = path.join(__dirname, ".auth/user.json");
 
-setup("authenticate", async ({ page }) => {
+/**
+ * Wait for Convex backend to be ready by polling the auth session endpoint.
+ * Returns 401 when ready (unauthenticated but backend is up), 404 when not ready.
+ */
+async function waitForConvexBackend(baseURL: string, maxWaitMs = 60000): Promise<void> {
+	const startTime = Date.now();
+	const pollIntervalMs = 1000;
+
+	while (Date.now() - startTime < maxWaitMs) {
+		try {
+			const response = await fetch(`${baseURL}/api/auth/get-session`);
+			// 401 means backend is ready but user isn't authenticated - that's what we want
+			// 200 would mean session exists (unlikely in clean state)
+			// 404 means Convex backend isn't ready yet
+			if (response.status !== 404) {
+				return;
+			}
+		} catch {
+			// Network error, keep waiting
+		}
+		await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+	}
+	throw new Error(`Convex backend did not become ready within ${maxWaitMs}ms`);
+}
+
+setup("authenticate", async ({ page, baseURL }) => {
+	// Wait for Convex backend to be ready before attempting signup
+	await waitForConvexBackend(baseURL ?? "http://localhost:3000");
+
 	const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 	const testEmail = `e2e-test-${uniqueId}@example.com`;
 	const testPassword = "TestPassword123!";
