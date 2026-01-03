@@ -28,13 +28,15 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
 	);
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"h2">) {
+interface CardTitleProps extends Omit<React.ComponentProps<"h2">, "children"> {
+	children: React.ReactNode;
+}
+
+function CardTitle({ className, children, ...props }: Readonly<CardTitleProps>) {
 	return (
-		<h2
-			data-slot="card-title"
-			className={cn("leading-tight font-semibold", className)}
-			{...props}
-		/>
+		<h2 data-slot="card-title" className={cn("leading-tight font-semibold", className)} {...props}>
+			{children}
+		</h2>
 	);
 }
 
