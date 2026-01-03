@@ -4,20 +4,54 @@ import { useQuery } from "convex/react";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { NoOrganizationGuard } from "@/components/products/no-organization-guard";
 import { ProductForm } from "@/components/products/product-form";
+import type { Product } from "@/components/products/types";
 import { useOrganization } from "@/components/providers/organization-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Criticality = "low" | "medium" | "high";
+function LoadingSkeleton() {
+	return (
+		<div className="container mx-auto max-w-2xl p-6">
+			<Card>
+				<CardHeader>
+					<Skeleton className="h-6 w-32" />
+					<Skeleton className="h-4 w-48" />
+				</CardHeader>
+				<CardContent className="space-y-4">
+					<Skeleton className="h-10 w-full" />
+					<Skeleton className="h-10 w-full" />
+					<Skeleton className="h-10 w-full" />
+				</CardContent>
+			</Card>
+		</div>
+	);
+}
 
-interface Product {
-	_id: string;
-	name: string;
-	description?: string | null;
-	criticality: Criticality;
-	owners: string[];
+function ProductNotFound() {
+	return (
+		<div className="container mx-auto max-w-2xl p-6">
+			<Card>
+				<CardHeader className="text-center">
+					<CardTitle>Product Not Found</CardTitle>
+					<CardDescription>
+						The product you&apos;re trying to edit doesn&apos;t exist or you don&apos;t have access
+						to it.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="flex justify-center">
+					<Button asChild>
+						<Link href="/products">
+							<ArrowLeftIcon className="mr-2 h-4 w-4" />
+							Back to Products
+						</Link>
+					</Button>
+				</CardContent>
+			</Card>
+		</div>
+	);
 }
 
 export default function EditProductPage() {
@@ -37,60 +71,15 @@ export default function EditProductPage() {
 	) as Product | null | undefined;
 
 	if (!activeOrganization) {
-		return (
-			<div className="flex flex-1 items-center justify-center">
-				<Card className="w-full max-w-md">
-					<CardHeader>
-						<CardTitle>No Organization</CardTitle>
-						<CardDescription>
-							Please select or create an organization to edit products.
-						</CardDescription>
-					</CardHeader>
-				</Card>
-			</div>
-		);
+		return <NoOrganizationGuard action="edit products" />;
 	}
 
 	if (product === undefined) {
-		return (
-			<div className="container mx-auto max-w-2xl p-6">
-				<Card>
-					<CardHeader>
-						<Skeleton className="h-6 w-32" />
-						<Skeleton className="h-4 w-48" />
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<Skeleton className="h-10 w-full" />
-						<Skeleton className="h-10 w-full" />
-						<Skeleton className="h-10 w-full" />
-					</CardContent>
-				</Card>
-			</div>
-		);
+		return <LoadingSkeleton />;
 	}
 
 	if (product === null) {
-		return (
-			<div className="container mx-auto max-w-2xl p-6">
-				<Card>
-					<CardHeader className="text-center">
-						<CardTitle>Product Not Found</CardTitle>
-						<CardDescription>
-							The product you&apos;re trying to edit doesn&apos;t exist or you don&apos;t have
-							access to it.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="flex justify-center">
-						<Button asChild>
-							<Link href="/products">
-								<ArrowLeftIcon className="mr-2 h-4 w-4" />
-								Back to Products
-							</Link>
-						</Button>
-					</CardContent>
-				</Card>
-			</div>
-		);
+		return <ProductNotFound />;
 	}
 
 	return (

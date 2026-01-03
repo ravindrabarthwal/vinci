@@ -5,65 +5,59 @@ import { ArrowLeftIcon, EditIcon, PlusIcon, TrashIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { NoOrganizationGuard } from "@/components/products/no-organization-guard";
+import {
+	criticalityColors,
+	type ProductWithRelations,
+	statusColors,
+	surfaceTypeLabels,
+} from "@/components/products/types";
 import { useOrganization } from "@/components/providers/organization-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Criticality = "low" | "medium" | "high";
-type SurfaceType = "repo" | "service" | "webapp" | "worker" | "infra";
-type FeatureStatus = "draft" | "ready" | "in_progress" | "completed";
-
-interface Product {
-	_id: string;
-	name: string;
-	description?: string | null;
-	criticality: Criticality;
-	owners: string[];
+function LoadingSkeleton() {
+	return (
+		<div className="container mx-auto max-w-4xl space-y-6 p-6">
+			<Skeleton className="h-8 w-48" />
+			<Card>
+				<CardHeader>
+					<Skeleton className="h-6 w-64" />
+					<Skeleton className="h-4 w-96" />
+				</CardHeader>
+				<CardContent className="space-y-4">
+					<Skeleton className="h-4 w-full" />
+					<Skeleton className="h-4 w-3/4" />
+				</CardContent>
+			</Card>
+		</div>
+	);
 }
 
-interface Surface {
-	_id: string;
-	name: string;
-	type: SurfaceType;
-	location?: string | null;
-	environments: Record<string, string>;
+function ProductNotFound() {
+	return (
+		<div className="container mx-auto max-w-4xl p-6">
+			<Card>
+				<CardHeader className="text-center">
+					<CardTitle>Product Not Found</CardTitle>
+					<CardDescription>
+						The product you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to
+						it.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="flex justify-center">
+					<Button asChild>
+						<Link href="/products">
+							<ArrowLeftIcon className="mr-2 h-4 w-4" />
+							Back to Products
+						</Link>
+					</Button>
+				</CardContent>
+			</Card>
+		</div>
+	);
 }
-
-interface Feature {
-	_id: string;
-	title: string;
-	description?: string | null;
-	status: FeatureStatus;
-	source: "manual" | "jira";
-	acceptanceCriteria: string[];
-}
-
-interface ProductWithRelations extends Product {
-	surfaces: Surface[];
-	features: Feature[];
-}
-
-const criticalityColors: Record<Criticality, string> = {
-	low: "bg-green-100 text-green-800",
-	medium: "bg-yellow-100 text-yellow-800",
-	high: "bg-red-100 text-red-800",
-};
-
-const surfaceTypeLabels: Record<SurfaceType, string> = {
-	repo: "Repository",
-	service: "Service",
-	webapp: "Web App",
-	worker: "Worker",
-	infra: "Infrastructure",
-};
-
-const statusColors: Record<FeatureStatus, string> = {
-	draft: "bg-gray-100 text-gray-800",
-	ready: "bg-blue-100 text-blue-800",
-	in_progress: "bg-purple-100 text-purple-800",
-	completed: "bg-green-100 text-green-800",
-};
 
 export default function ProductDetailPage() {
 	const params = useParams();
@@ -104,60 +98,15 @@ export default function ProductDetailPage() {
 	};
 
 	if (!activeOrganization) {
-		return (
-			<div className="flex flex-1 items-center justify-center">
-				<Card className="w-full max-w-md">
-					<CardHeader>
-						<CardTitle>No Organization</CardTitle>
-						<CardDescription>
-							Please select or create an organization to view products.
-						</CardDescription>
-					</CardHeader>
-				</Card>
-			</div>
-		);
+		return <NoOrganizationGuard action="view products" />;
 	}
 
 	if (product === undefined) {
-		return (
-			<div className="container mx-auto max-w-4xl space-y-6 p-6">
-				<Skeleton className="h-8 w-48" />
-				<Card>
-					<CardHeader>
-						<Skeleton className="h-6 w-64" />
-						<Skeleton className="h-4 w-96" />
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<Skeleton className="h-4 w-full" />
-						<Skeleton className="h-4 w-3/4" />
-					</CardContent>
-				</Card>
-			</div>
-		);
+		return <LoadingSkeleton />;
 	}
 
 	if (product === null) {
-		return (
-			<div className="container mx-auto max-w-4xl p-6">
-				<Card>
-					<CardHeader className="text-center">
-						<CardTitle>Product Not Found</CardTitle>
-						<CardDescription>
-							The product you&apos;re looking for doesn&apos;t exist or you don&apos;t have access
-							to it.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="flex justify-center">
-						<Button asChild>
-							<Link href="/products">
-								<ArrowLeftIcon className="mr-2 h-4 w-4" />
-								Back to Products
-							</Link>
-						</Button>
-					</CardContent>
-				</Card>
-			</div>
-		);
+		return <ProductNotFound />;
 	}
 
 	return (

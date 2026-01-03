@@ -3,9 +3,10 @@
 import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { NoOrganizationGuard } from "@/components/products/no-organization-guard";
+import type { Criticality, Product } from "@/components/products/types";
 import { useOrganization } from "@/components/providers/organization-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,17 +17,16 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-type Criticality = "low" | "medium" | "high";
-
 interface ProductFormProps {
-	mode: "create" | "edit";
-	initialData?: {
-		_id: string;
-		name: string;
-		description?: string | null;
-		criticality: Criticality;
-		owners: string[];
-	};
+	readonly mode: "create" | "edit";
+	readonly initialData?: Pick<Product, "_id" | "name" | "description" | "criticality" | "owners">;
+}
+
+function getSubmitButtonLabel(mode: "create" | "edit", isSubmitting: boolean): string {
+	if (isSubmitting) {
+		return mode === "create" ? "Creating..." : "Saving...";
+	}
+	return mode === "create" ? "Create Product" : "Save Changes";
 }
 
 export function ProductForm({ mode, initialData }: ProductFormProps) {
@@ -72,6 +72,7 @@ export function ProductForm({ mode, initialData }: ProductFormProps) {
 				router.push(`/products/${productId}`);
 			} else if (initialData) {
 				await updateProduct({
+					organizationId: activeOrganization.id,
 					productId: initialData._id,
 					name: name.trim(),
 					description: description.trim() || null,
@@ -87,18 +88,7 @@ export function ProductForm({ mode, initialData }: ProductFormProps) {
 	};
 
 	if (!activeOrganization) {
-		return (
-			<div className="flex flex-1 items-center justify-center">
-				<Card className="w-full max-w-md">
-					<CardHeader>
-						<CardTitle>No Organization</CardTitle>
-						<CardDescription>
-							Please select or create an organization to manage products.
-						</CardDescription>
-					</CardHeader>
-				</Card>
-			</div>
-		);
+		return <NoOrganizationGuard action="manage products" />;
 	}
 
 	return (
@@ -171,13 +161,7 @@ export function ProductForm({ mode, initialData }: ProductFormProps) {
 					Cancel
 				</Button>
 				<Button type="submit" disabled={isSubmitting || !name.trim()}>
-					{isSubmitting
-						? mode === "create"
-							? "Creating..."
-							: "Saving..."
-						: mode === "create"
-							? "Create Product"
-							: "Save Changes"}
+					{getSubmitButtonLabel(mode, isSubmitting)}
 				</Button>
 			</div>
 		</form>
