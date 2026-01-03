@@ -71,7 +71,7 @@ setup("authenticate", async ({ page }) => {
 
 	await expect(page).toHaveURL("/org/new", { timeout: 15000 });
 
-	await page.getByLabel("Organization Name").fill("Test Organization");
+	await page.getByLabel("Organization Name").fill(`Test Organization ${uniqueId}`);
 	await page.getByRole("button", { name: "Create Organization" }).click();
 
 	await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
