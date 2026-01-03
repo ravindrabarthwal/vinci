@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./model/auth";
 import { getUserOrganizations } from "./model/organizations";
 
@@ -72,12 +73,53 @@ const featureValidator = v.object({
 	updatedAt: v.number(),
 });
 
-async function verifyOrgAccess(
-	ctx: Parameters<typeof getUserOrganizations>[0],
-	organizationId: string,
-): Promise<boolean> {
+type Ctx = QueryCtx | MutationCtx;
+
+async function requireOrgAccess(ctx: Ctx, organizationId: string): Promise<void> {
+	const user = await getAuthenticatedUser(ctx);
+	if (!user) {
+		throw new Error("Unauthorized");
+	}
 	const { organizations } = await getUserOrganizations(ctx);
-	return organizations.some((org) => org.id === organizationId);
+	const hasAccess = organizations.some((org) => org.id === organizationId);
+	if (!hasAccess) {
+		throw new Error("Access denied to organization");
+	}
+}
+
+async function getProductWithAccess(ctx: Ctx, productId: Id<"product">, organizationId: string) {
+	await requireOrgAccess(ctx, organizationId);
+	const product = await ctx.db.get(productId);
+	if (!product || product.organizationId !== organizationId) {
+		return null;
+	}
+	return product;
+}
+
+async function requireProductAccess(ctx: Ctx, productId: Id<"product">, organizationId: string) {
+	const product = await getProductWithAccess(ctx, productId, organizationId);
+	if (!product) {
+		throw new Error("Product not found");
+	}
+	return product;
+}
+
+async function requireSurfaceAccess(ctx: Ctx, surfaceId: Id<"surface">, organizationId: string) {
+	await requireOrgAccess(ctx, organizationId);
+	const surface = await ctx.db.get(surfaceId);
+	if (!surface || surface.organizationId !== organizationId) {
+		throw new Error("Surface not found");
+	}
+	return surface;
+}
+
+async function requireFeatureAccess(ctx: Ctx, featureId: Id<"feature">, organizationId: string) {
+	await requireOrgAccess(ctx, organizationId);
+	const feature = await ctx.db.get(featureId);
+	if (!feature || feature.organizationId !== organizationId) {
+		throw new Error("Feature not found");
+	}
+	return feature;
 }
 
 export const list = query({
@@ -86,16 +128,7 @@ export const list = query({
 	},
 	returns: v.array(productValidator),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
+		await requireOrgAccess(ctx, args.organizationId);
 		return await ctx.db
 			.query("product")
 			.withIndex("by_organizationId", (q) => q.eq("organizationId", args.organizationId))
@@ -110,22 +143,7 @@ export const get = query({
 	},
 	returns: v.union(v.null(), productValidator),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			return null;
-		}
-
-		return product;
+		return await getProductWithAccess(ctx, args.productId, args.organizationId);
 	},
 });
 
@@ -143,18 +161,8 @@ export const getWithRelations = query({
 		}),
 	),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
+		const product = await getProductWithAccess(ctx, args.productId, args.organizationId);
+		if (!product) {
 			return null;
 		}
 
@@ -186,16 +194,7 @@ export const create = mutation({
 	},
 	returns: v.id("product"),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
+		await requireOrgAccess(ctx, args.organizationId);
 		const now = Date.now();
 		return await ctx.db.insert("product", {
 			organizationId: args.organizationId,
@@ -220,20 +219,7 @@ export const update = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			throw new Error("Product not found");
-		}
+		await requireProductAccess(ctx, args.productId, args.organizationId);
 
 		const updates: Partial<{
 			name: string;
@@ -263,20 +249,7 @@ export const remove = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			throw new Error("Product not found");
-		}
+		await requireProductAccess(ctx, args.productId, args.organizationId);
 
 		const surfaces = await ctx.db
 			.query("surface")
@@ -306,21 +279,7 @@ export const listSurfaces = query({
 	},
 	returns: v.array(surfaceValidator),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			throw new Error("Product not found");
-		}
-
+		await requireProductAccess(ctx, args.productId, args.organizationId);
 		return await ctx.db
 			.query("surface")
 			.withIndex("by_productId", (q) => q.eq("productId", args.productId))
@@ -347,21 +306,7 @@ export const createSurface = mutation({
 	},
 	returns: v.id("surface"),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			throw new Error("Product not found");
-		}
-
+		await requireProductAccess(ctx, args.productId, args.organizationId);
 		const now = Date.now();
 		return await ctx.db.insert("surface", {
 			productId: args.productId,
@@ -396,20 +341,7 @@ export const updateSurface = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const surface = await ctx.db.get(args.surfaceId);
-		if (!surface || surface.organizationId !== args.organizationId) {
-			throw new Error("Surface not found");
-		}
+		await requireSurfaceAccess(ctx, args.surfaceId, args.organizationId);
 
 		const updates: Partial<{
 			name: string;
@@ -446,21 +378,7 @@ export const removeSurface = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const surface = await ctx.db.get(args.surfaceId);
-		if (!surface || surface.organizationId !== args.organizationId) {
-			throw new Error("Surface not found");
-		}
-
+		await requireSurfaceAccess(ctx, args.surfaceId, args.organizationId);
 		await ctx.db.delete(args.surfaceId);
 		return null;
 	},
@@ -473,21 +391,7 @@ export const listFeatures = query({
 	},
 	returns: v.array(featureValidator),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			throw new Error("Product not found");
-		}
-
+		await requireProductAccess(ctx, args.productId, args.organizationId);
 		return await ctx.db
 			.query("feature")
 			.withIndex("by_productId", (q) => q.eq("productId", args.productId))
@@ -508,21 +412,7 @@ export const createFeature = mutation({
 	},
 	returns: v.id("feature"),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const product = await ctx.db.get(args.productId);
-		if (!product || product.organizationId !== args.organizationId) {
-			throw new Error("Product not found");
-		}
-
+		await requireProductAccess(ctx, args.productId, args.organizationId);
 		const now = Date.now();
 		return await ctx.db.insert("feature", {
 			productId: args.productId,
@@ -552,20 +442,7 @@ export const updateFeature = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const feature = await ctx.db.get(args.featureId);
-		if (!feature || feature.organizationId !== args.organizationId) {
-			throw new Error("Feature not found");
-		}
+		await requireFeatureAccess(ctx, args.featureId, args.organizationId);
 
 		const updates: Partial<{
 			title: string;
@@ -599,21 +476,7 @@ export const removeFeature = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const user = await getAuthenticatedUser(ctx);
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
-
-		const hasAccess = await verifyOrgAccess(ctx, args.organizationId);
-		if (!hasAccess) {
-			throw new Error("Access denied to organization");
-		}
-
-		const feature = await ctx.db.get(args.featureId);
-		if (!feature || feature.organizationId !== args.organizationId) {
-			throw new Error("Feature not found");
-		}
-
+		await requireFeatureAccess(ctx, args.featureId, args.organizationId);
 		await ctx.db.delete(args.featureId);
 		return null;
 	},
