@@ -82,6 +82,30 @@ interface Issue {
 	creationDate: string;
 }
 
+interface SecurityHotspot {
+	key: string;
+	component: string;
+	project: string;
+	securityCategory: string;
+	vulnerabilityProbability: "HIGH" | "MEDIUM" | "LOW";
+	status: "TO_REVIEW" | "REVIEWED";
+	resolution?: "SAFE" | "FIXED" | "ACKNOWLEDGED";
+	line?: number;
+	message: string;
+	ruleKey: string;
+	creationDate: string;
+	updateDate: string;
+}
+
+interface SecurityHotspotsResponse {
+	paging: {
+		pageIndex: number;
+		pageSize: number;
+		total: number;
+	};
+	hotspots: SecurityHotspot[];
+}
+
 interface IssuesResponse {
 	total: number;
 	p: number;
@@ -133,11 +157,25 @@ interface SonarReport {
 			rule: string;
 		}>;
 	};
+	securityHotspots: {
+		total: number;
+		byCategory: Record<string, number>;
+		byProbability: Record<string, number>;
+		items: Array<{
+			probability: string;
+			category: string;
+			message: string;
+			file: string;
+			line?: number;
+			rule: string;
+			status: string;
+		}>;
+	};
 }
 
 function loadSonarPropertiesSync(): { projectKey?: string; organization?: string } {
 	try {
-		const content = require("fs").readFileSync("sonar-project.properties", "utf-8");
+		const content = require("node:fs").readFileSync("sonar-project.properties", "utf-8");
 		const props: Record<string, string> = {};
 
 		for (const line of content.split("\n")) {
@@ -286,11 +324,25 @@ async function fetchIssues(
 	});
 }
 
+async function fetchSecurityHotspots(
+	config: SonarConfig,
+	options: { pr?: string; branch?: string },
+): Promise<SecurityHotspotsResponse> {
+	return sonarFetch<SecurityHotspotsResponse>(config, "/api/hotspots/search", {
+		projectKey: config.projectKey,
+		ps: "100",
+		status: "TO_REVIEW",
+		pullRequest: options.pr,
+		branch: options.branch,
+	});
+}
+
 function buildReport(
 	config: SonarConfig,
 	qualityGate: QualityGateStatus,
 	metrics: MeasuresResponse,
 	issues: IssuesResponse,
+	hotspots: SecurityHotspotsResponse,
 	options: { pr?: string; branch?: string },
 ): SonarReport {
 	const metricsMap: Record<string, string> = {};
@@ -304,6 +356,15 @@ function buildReport(
 	for (const issue of issues.issues) {
 		byType[issue.type] = (byType[issue.type] ?? 0) + 1;
 		bySeverity[issue.severity] = (bySeverity[issue.severity] ?? 0) + 1;
+	}
+
+	const byCategory: Record<string, number> = {};
+	const byProbability: Record<string, number> = {};
+
+	for (const hotspot of hotspots.hotspots) {
+		byCategory[hotspot.securityCategory] = (byCategory[hotspot.securityCategory] ?? 0) + 1;
+		byProbability[hotspot.vulnerabilityProbability] =
+			(byProbability[hotspot.vulnerabilityProbability] ?? 0) + 1;
 	}
 
 	return {
@@ -337,6 +398,20 @@ function buildReport(
 				file: i.component.replace(`${config.projectKey}:`, ""),
 				line: i.line,
 				rule: i.rule,
+			})),
+		},
+		securityHotspots: {
+			total: hotspots.paging.total,
+			byCategory,
+			byProbability,
+			items: hotspots.hotspots.map((h) => ({
+				probability: h.vulnerabilityProbability,
+				category: h.securityCategory,
+				message: h.message,
+				file: h.component.replace(`${config.projectKey}:`, ""),
+				line: h.line,
+				rule: h.ruleKey,
+				status: h.status,
 			})),
 		},
 	};
@@ -427,6 +502,32 @@ function formatSummary(report: SonarReport): string {
 		lines.push("");
 	}
 
+	lines.push(`${hr}`);
+	lines.push(`🔥 SECURITY HOTSPOTS (${report.securityHotspots.total} to review)`);
+	lines.push(`${hr}`);
+	lines.push("");
+
+	if (report.securityHotspots.total > 0) {
+		lines.push("  By Vulnerability Probability:");
+		const probabilityOrder = ["HIGH", "MEDIUM", "LOW"];
+		for (const prob of probabilityOrder) {
+			const count = report.securityHotspots.byProbability[prob];
+			if (count !== undefined) {
+				const icon = prob === "HIGH" ? "🔴" : prob === "MEDIUM" ? "🟠" : "🟡";
+				lines.push(`    ${icon} ${prob}: ${count}`);
+			}
+		}
+		lines.push("");
+		lines.push("  By Category:");
+		for (const [category, count] of Object.entries(report.securityHotspots.byCategory)) {
+			lines.push(`    ${category}: ${count}`);
+		}
+		lines.push("");
+	} else {
+		lines.push("  No security hotspots to review! 🎉");
+		lines.push("");
+	}
+
 	return lines.join("\n");
 }
 
@@ -452,6 +553,33 @@ function formatDetailed(report: SonarReport): string {
 				output += `  [${issue.type}] ${issue.message}\n`;
 				output += `    📁 ${location}\n`;
 				output += `    📏 Rule: ${issue.rule}\n`;
+				output += "\n";
+			}
+		}
+	}
+
+	if (report.securityHotspots.items.length > 0) {
+		output += `\n${hr}\n`;
+		output += "🔥 SECURITY HOTSPOT DETAILS\n";
+		output += `${hr}\n\n`;
+
+		const probabilityOrder = ["HIGH", "MEDIUM", "LOW"];
+
+		for (const probability of probabilityOrder) {
+			const probHotspots = report.securityHotspots.items.filter(
+				(h) => h.probability === probability,
+			);
+			if (probHotspots.length === 0) continue;
+
+			const icon = probability === "HIGH" ? "🔴" : probability === "MEDIUM" ? "🟠" : "🟡";
+			output += `\n── ${icon} ${probability} PROBABILITY (${probHotspots.length}) ──\n\n`;
+
+			for (const hotspot of probHotspots) {
+				const location = hotspot.line ? `${hotspot.file}:${hotspot.line}` : hotspot.file;
+				output += `  [${hotspot.category}] ${hotspot.message}\n`;
+				output += `    📁 ${location}\n`;
+				output += `    📏 Rule: ${hotspot.rule}\n`;
+				output += `    📌 Status: ${hotspot.status}\n`;
 				output += "\n";
 			}
 		}
@@ -529,13 +657,14 @@ async function main(): Promise<void> {
 
 	console.error("Fetching SonarCloud analysis...");
 
-	const [qualityGate, metrics, issues] = await Promise.all([
+	const [qualityGate, metrics, issues, hotspots] = await Promise.all([
 		fetchQualityGate(config, options),
 		fetchMetrics(config, options),
 		fetchIssues(config, options),
+		fetchSecurityHotspots(config, options),
 	]);
 
-	const report = buildReport(config, qualityGate, metrics, issues, options);
+	const report = buildReport(config, qualityGate, metrics, issues, hotspots, options);
 
 	switch (options.format) {
 		case "json":
