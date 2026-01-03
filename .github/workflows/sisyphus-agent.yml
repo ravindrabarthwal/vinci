@@ -68,6 +68,7 @@ jobs:
       - name: Setup OpenCode with oh-my-opencode plugin
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+          OH_MY_OPENCODE_CONFIG: ${{ vars.OH_MY_OPENCODE_CONFIG }}
         run: |
           set -euo pipefail
           export PATH="$HOME/.opencode/bin:$PATH"
@@ -95,18 +96,25 @@ jobs:
             "plugin": ["oh-my-opencode"]
           }' > ~/.config/opencode/opencode.json
 
-          jq -n '{
-            "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-            "agents": {
-              "Sisyphus": { "model": "github-copilot/claude-opus-4.5" },
-              "oracle": { "model": "github-copilot/gpt-5.2" },
-              "librarian": { "model": "github-copilot/claude-sonnet-4.5" },
-              "explore": { "model": "github-copilot/claude-sonnet-4.5" },
-              "frontend-ui-ux-engineer": { "model": "github-copilot/claude-sonnet-4.5" },
-              "document-writer": { "model": "github-copilot/claude-sonnet-4.5" },
-              "multimodal-looker": { "model": "github-copilot/claude-sonnet-4.5" }
-            }
-          }' > ~/.config/opencode/oh-my-opencode.json
+          # Use OH_MY_OPENCODE_CONFIG env var if present, otherwise use default config
+          if [[ -n "${OH_MY_OPENCODE_CONFIG:-}" ]]; then
+            echo "Using oh-my-opencode config from environment variable"
+            echo "$OH_MY_OPENCODE_CONFIG" > ~/.config/opencode/oh-my-opencode.json
+          else
+            echo "Using default oh-my-opencode config"
+            jq -n '{
+              "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+              "agents": {
+                "Sisyphus": { "model": "github-copilot/claude-opus-4.5" },
+                "oracle": { "model": "github-copilot/gpt-5.2" },
+                "librarian": { "model": "github-copilot/claude-sonnet-4.5" },
+                "explore": { "model": "github-copilot/claude-sonnet-4.5" },
+                "frontend-ui-ux-engineer": { "model": "github-copilot/claude-sonnet-4.5" },
+                "document-writer": { "model": "github-copilot/claude-sonnet-4.5" },
+                "multimodal-looker": { "model": "github-copilot/claude-sonnet-4.5" }
+              }
+            }' > ~/.config/opencode/oh-my-opencode.json
+          fi
 
           OMO_JSON=~/.config/opencode/oh-my-opencode.json
           cat > /tmp/prompt_append.txt <<'PROMPT_EOF'
@@ -140,11 +148,49 @@ jobs:
           NO trailing backticks or spaces after closing ```.
           For inline code, use SINGLE backticks.
 
+          ### Branch Management (MANDATORY)
+
+          When working on issues or closed PRs: Create a new branch from the default branch if one does not already exist for this work. Use a descriptive branch name (e.g., fix/issue-123-description or feat/issue-456-feature-name).
+
+          When working on open PRs: Use the EXISTING branch associated with the PR. Commit directly to that branch and push. Do NOT create a new branch.
+
+          ### Testing Requirements (MANDATORY - NO EXCEPTIONS)
+
+          If you modify any file that may require tests, you MUST add the appropriate tests. This is NOT optional.
+
+          - Unit tests: For utility functions, pure logic, helpers. Location: tests/unit/*.test.ts
+          - Convex tests: For backend functions, mutations, queries. Location: convex/*.test.ts
+          - E2E Playwright tests: For user-facing features, flows, UI interactions. Location: e2e/
+
+          NEVER fake tests, mock critical functionality to skip actual testing, or delete/skip failing tests to make the build pass.
+          If you get stuck on testing for an extended period, ask for help in the issue/PR comments instead of bypassing tests.
+
           ### Rules
           - EVERY response = GitHub comment (use heredoc for proper escaping)
           - Code changes = PR (never push main/master)
           - Setup: bun install first
           - Acknowledge immediately, report when done
+
+          ### SonarCloud Analysis (when needed)
+
+          If you need to fetch SonarCloud analysis details for this PR or the entire codebase:
+
+          ```bash
+          # For PR analysis (use PR number from context)
+          bun run scripts/pull-sonar-report.ts --pr <PR_NUMBER> --format detailed
+
+          # For branch analysis
+          bun run scripts/pull-sonar-report.ts --branch <BRANCH_NAME> --format detailed
+
+          # For main project analysis
+          bun run scripts/pull-sonar-report.ts --format detailed
+
+          # For JSON output (machine-readable)
+          bun run scripts/pull-sonar-report.ts --pr <PR_NUMBER> --format json
+          ```
+
+          The script requires SONAR_TOKEN environment variable (already configured in workflow).
+          Output includes: quality gate status, code metrics, and detailed issue list.
           PROMPT_EOF
 
           PROMPT_APPEND=$(cat /tmp/prompt_append.txt)
@@ -221,6 +267,7 @@ jobs:
       - name: Run oh-my-opencode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           USER_COMMENT: ${{ steps.context.outputs.comment }}
           COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
           CONTEXT_TYPE: ${{ steps.context.outputs.type }}

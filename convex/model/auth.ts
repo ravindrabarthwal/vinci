@@ -4,12 +4,12 @@ import { authComponent } from "../lib/auth_options";
 
 type QueryCtx = GenericQueryCtx<DataModel>;
 
-export type AuthUser = Awaited<ReturnType<typeof authComponent.getAuthUser>>;
+export type AuthUser = Awaited<ReturnType<typeof authComponent.safeGetAuthUser>>;
 
 export async function getAuthenticatedUser(ctx: QueryCtx): Promise<AuthUser> {
-	return await authComponent.getAuthUser(ctx);
+	return await authComponent.safeGetAuthUser(ctx);
 }
 
 export function isAuthenticated(user: AuthUser): user is NonNullable<AuthUser> {
-	return user !== null;
+	return user != null;
 }

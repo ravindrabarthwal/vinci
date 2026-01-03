@@ -1,67 +1,120 @@
-# Convex Backend Directory Structure
+# CONVEX BACKEND
+
+> **WRITING TESTS?** See **[TESTING.md](./TESTING.md)** for comprehensive testing guide with `convex-test` patterns.
+>
+> **MANDATORY**: Convex tests use standard `describe`/`test` blocks — NOT `#given #when #then` comments.
+
+## OVERVIEW
+
+Convex functions with Better Auth integration. Organization multi-tenancy.
+
+## STRUCTURE
 
 ```
 convex/
-├── _generated/           # Auto-generated (DO NOT EDIT)
-├── betterAuth/           # Better Auth component (managed by library)
-├── lib/                  # Shared utilities and config
-│   ├── auth_options.ts   # Auth config (breaks circular deps)
-│   └── log.ts            # Logger
-├── model/                # Business logic helpers (thin API, thick model)
-│   ├── auth.ts           # Auth helpers: getAuthenticatedUser, isAuthenticated
-│   └── organizations.ts  # Org helpers: getUserOrganizations, hasUserOrganizations
-├── auth.ts               # Auth public API (thin wrapper over model)
-├── auth.config.ts        # Auth configuration
-├── http.ts               # HTTP router (must stay at root)
-├── organizations.ts      # Organizations public API (thin wrapper)
-└── schema.ts             # Database schema (must stay at root)
+├── betterAuth/       # Auth component (schema, adapter, config)
+│   └── schema.ts     # ALL tables defined here (user, session, org, etc.)
+├── model/            # Business logic layer
+│   ├── auth.ts       # getAuthenticatedUser(), isAuthenticated()
+│   └── organizations.ts  # getUserOrganizations(), hasUserOrganizations()
+├── lib/              # Utilities
+│   ├── auth_options.ts   # Runtime Better Auth config
+│   └── log.ts        # Convex-specific logger
+├── auth.ts           # Auth queries (getCurrentUser)
+├── organizations.ts  # Org queries (listUserOrganizations)
+├── http.ts           # HTTP route registration
+└── schema.ts         # Empty (tables in betterAuth/schema.ts)
 ```
 
-## Layer Responsibilities
+## WHERE TO LOOK
 
-| Layer | Purpose | Example |
-|-------|---------|---------|
-| `model/` | Business logic, reusable helpers, type guards | `getAuthenticatedUser(ctx)` |
-| `lib/` | Shared config, utilities, breaking circular deps | `createAuthOptions()`, logger |
-| Root `.ts` | Public API endpoints (thin wrappers) | `query({...})`, `mutation({...})` |
+| Task | Location |
+|------|----------|
+| Add table/field | `betterAuth/schema.ts` |
+| Add query/mutation | Create file in `convex/`, use model layer |
+| Auth check in function | `import { getAuthenticatedUser } from "./model/auth"` |
+| Org operations | `model/organizations.ts` |
+| HTTP endpoints | `http.ts` |
 
-## Where to Put New Code
+## PATTERNS
 
-| Adding | Location | Notes |
-|--------|----------|-------|
-| New public query/mutation | Root `convex/` | Thin wrapper that calls model helpers |
-| Reusable business logic | `convex/model/` | Pure helpers, type guards, ctx-dependent utilities |
-| Shared configuration | `convex/lib/` | Avoid circular deps, exports only config/types |
-| HTTP endpoints | `convex/http.ts` | Must be at root (Convex requirement) |
-| Schema changes | `convex/schema.ts` | Must be at root (Convex requirement) |
-
-## Anti-Patterns (Convex Structure)
-
-- **Moving `schema.ts`**: Must stay at convex root
-- **Moving `http.ts`**: Must stay at convex root  
-- **Public functions in subdirs**: Breaks file-based routing API paths
-- **Circular imports**: Use `lib/` layer to break cycles
-- **Business logic in API files**: Extract to `model/` layer
-
----
-
-### Adding Logging to New Features
-
-**Convex Functions:**
+### Query/Mutation Structure
 ```typescript
-import { createConvexLogger } from "./lib/log";
+import { query } from "./_generated/server";
+import { getAuthenticatedUser } from "./model/auth";
+import { createLogger } from "./lib/log";
 
-const logger = createConvexLogger({ module: "myModule" });
-
-export const myMutation = mutation({
+export const myQuery = query({
+  args: { /* validators */ },
   handler: async (ctx, args) => {
-    logger.info("Mutation started", { userId: args.userId });
-    // ... your code
-    logger.info("Mutation completed", { resultId: result._id });
+    const log = createLogger("myQuery");
+    const user = await getAuthenticatedUser(ctx);
+    if (!user) throw new Error("Unauthorized");
+    
+    log.info("Executing query", { userId: user._id });
+    // ... business logic
   },
 });
 ```
 
+### Model Layer Pattern
+- Queries/mutations call model functions for business logic
+- Models access `ctx.db` and `ctx.auth`
+- Keep handlers thin, logic in models
+
+### Schema Notes
+- **All tables** in `betterAuth/schema.ts` (not root schema.ts)
+- Tables: `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`, `twoFactor`, `passkey`, `jwks`, `rateLimit`
+- Use `v.optional(v.union(v.null(), v.type()))` for nullable fields
+
+## TESTING
+
+> **📖 FULL GUIDE**: See **[TESTING.md](./TESTING.md)** for complete patterns and examples.
+
+```bash
+bun run test:convex        # Run Convex tests
+bun run test:convex:watch  # Watch mode
+```
+
+### ⚠️ MANDATORY Test Style
+
+| Rule | Requirement |
+|------|-------------|
+| **Structure** | Use `describe`/`test` blocks with descriptive names |
+| **Style** | Standard Vitest patterns — NO `#given #when #then` comments |
+| **Library** | Use `convex-test` with schema and modules |
+| **Reference** | https://docs.convex.dev/testing/convex-test |
+
+**Example (CORRECT)**:
+```typescript
+import { convexTest } from "convex-test";
+import { describe, expect, test } from "vitest";
+import schema from "./betterAuth/schema";
+import { modules } from "./test.setup";
+
+describe("Organizations", () => {
+  test("returns empty array when user has no organizations", async () => {
+    const t = convexTest(schema, modules);
+    const result = await t.query(api.organizations.listUserOrganizations);
+    expect(result).toEqual([]);
+  });
+});
+```
+
+**WRONG** (do NOT use in Convex tests):
+```typescript
+// ❌ Do NOT use #given #when #then in Convex tests
+it("#given no user #when query called #then returns empty", ...);
+```
+
+## ANTI-PATTERNS
+
+- **Never** define tables in root `schema.ts` (use betterAuth/schema.ts)
+- **Never** import runtime auth from `betterAuth/auth.ts` (static config only)
+- **Never** access `ctx.db` directly in handlers (use model layer)
+
+
+### HIGHLY RECOMMENDED BY CONVEX ENGINEERING TEAM
 # Convex guidelines
 ## Function guidelines
 ### New function syntax
