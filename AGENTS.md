@@ -109,6 +109,65 @@ bun run kill:all         # Kill dev server ports
 - **Never** commit `.env` files (use `.env.example`)
 - **Never** import from `convex/_generated` directly in components (use hooks)
 - **Never** use bare `console.log` in production code (use logging system)
+- **Never** modify ShadCN UI components directly — wrap them instead (see below)
+
+## SHADCN UI COMPONENTS
+
+UI components in `src/components/ui/` are from [shadcn/ui](https://ui.shadcn.com/) registry (radix-lyra style).
+
+### Why Not Modify Directly?
+
+ShadCN components can be re-downloaded to get updates. Direct modifications will be lost on re-download and require manual merge. Always prefer wrapping or extending instead.
+
+### Current Customizations
+
+| Component | Modification | Reason |
+|-----------|--------------|--------|
+| `card.tsx` | `CardTitleProps` uses `<h2>` with required `children` | Accessibility — headings must have content |
+| `sidebar.tsx` | `biome-ignore` comment on line 82 | Lint suppression for standard cookie usage |
+| `sidebar.tsx` | Removed `setOpenMobile` from hook dependencies | Biome lint fix — state setters are stable |
+| `skeleton.tsx` | React import added | Missing from registry download |
+
+### Guidelines
+
+1. **Prefer ShadCN components over custom implementations** — they follow established patterns and are well-tested
+
+2. **Keep UI components pure** — no API calls, auth logic, or app-specific state in `/ui` files. Business logic belongs in:
+   - Page components (`src/app/`)
+   - Wrapper components (`src/components/`)
+
+3. **Extending components** — create wrappers instead of modifying source:
+   ```typescript
+   // src/components/custom-button.tsx
+   import { Button, ButtonProps } from "@/components/ui/button";
+   import { cn } from "@/lib/utils";
+
+   export function CustomButton({ className, ...props }: ButtonProps) {
+     return <Button className={cn("your-styles", className)} {...props} />;
+   }
+   ```
+
+4. **Re-downloading components**:
+   ```bash
+   # Single component
+   bunx shadcn@latest add button --overwrite
+
+   # Multiple components
+   bunx shadcn@latest add button card dialog --overwrite
+
+   # After re-download, restore customizations listed in table above
+   ```
+
+5. **Adding new components**:
+   ```bash
+   bunx shadcn@latest add [component-name]
+   ```
+
+### Component Configuration
+- **Config file**: `components.json`
+- **Style**: `radix-lyra`
+- **Icon library**: `hugeicons`
+- **Path alias**: `@/components/ui`
 
 ## NOTES
 
