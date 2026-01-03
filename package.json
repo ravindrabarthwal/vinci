@@ -19,6 +19,7 @@
 		"test:convex": "vitest run",
 		"test:convex:watch": "vitest",
 		"test:e2e": "playwright test",
+		"dev:all:ci": "concurrently --kill-others-on-fail --names next,convex --prefix-colors blue,magenta \"bun run dev\" \"bun run dev:convex:raw\"",
 		"test:e2e:ui": "playwright test --ui",
 		"test:all": "bun run test && bun run test:convex && bun run test:e2e",
 		"playwright:install": "playwright install",
