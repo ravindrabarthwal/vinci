@@ -421,8 +421,10 @@ test.describe("Feature CRUD", () => {
 		const criteriaInputs = dialog.locator('input[placeholder^="Criterion"]');
 		await expect(criteriaInputs).toHaveCount(3);
 
-		// Get only trash buttons (variant="ghost" with TrashIcon), not the Add button (variant="outline")
-		const trashButtons = dialog.locator('button[type="button"]:has(svg.text-muted-foreground)');
+		// Get only trash buttons (buttons that are siblings of criterion inputs)
+		const trashButtons = dialog.locator(
+			'div:has(> input[placeholder^="Criterion"]) > button[type="button"]',
+		);
 		await expect(trashButtons).toHaveCount(3);
 		await trashButtons.nth(1).click();
 
