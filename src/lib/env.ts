@@ -19,9 +19,14 @@ const validLogLevels: readonly LogLevel[] = [
 ] as const;
 
 function validateEnv(): EnvConfig {
-	const required = ["NEXT_PUBLIC_CONVEX_URL", "NEXT_PUBLIC_CONVEX_SITE_URL"] as const;
+	const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+	const convexSiteUrl =
+		process.env.NEXT_PUBLIC_CONVEX_SITE_URL ??
+		(convexUrl ? convexUrl.replace(":3210", ":3211") : undefined);
 
-	const missing = required.filter((key) => !process.env[key]);
+	const missing: string[] = [];
+	if (!convexUrl) missing.push("NEXT_PUBLIC_CONVEX_URL");
+	if (!convexSiteUrl) missing.push("NEXT_PUBLIC_CONVEX_SITE_URL");
 
 	if (missing.length > 0) {
 		throw new Error(
@@ -40,8 +45,8 @@ function validateEnv(): EnvConfig {
 	const nodeEnv = (process.env.NODE_ENV ?? "development") as EnvConfig["NODE_ENV"];
 
 	return {
-		NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL as string,
-		NEXT_PUBLIC_CONVEX_SITE_URL: process.env.NEXT_PUBLIC_CONVEX_SITE_URL as string,
+		NEXT_PUBLIC_CONVEX_URL: convexUrl as string,
+		NEXT_PUBLIC_CONVEX_SITE_URL: convexSiteUrl as string,
 		LOG_LEVEL: logLevelInput as LogLevel,
 		LOG_DIR: process.env.LOG_DIR ?? ".logs",
 		LOG_SILENT: process.env.LOG_SILENT === "true",
