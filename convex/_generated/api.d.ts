@@ -32,7 +32,7 @@ declare const fullApi: ApiFromModules<{
   "model/organizations": typeof model_organizations;
   organizations: typeof organizations;
   products: typeof products;
-}>;;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
