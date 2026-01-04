@@ -168,7 +168,7 @@ test.describe("Surface CRUD", () => {
 
 		await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
 		await expect(page.getByText(surfaceName)).toBeVisible({ timeout: 10000 });
-		await expect(page.getByText("Service")).toBeVisible();
+		await expect(page.getByText("Service", { exact: true })).toBeVisible();
 		await expect(page.getByText("https://github.com/org/api-service")).toBeVisible();
 	});
 
@@ -176,7 +176,7 @@ test.describe("Surface CRUD", () => {
 		const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 		const productName = `Edit Surface Product ${uniqueId}`;
 		const surfaceName = `frontend-${uniqueId}`;
-		const updatedSurfaceName = `updated-frontend-${uniqueId}`;
+		const updatedSurfaceName = `renamed-surface-${uniqueId}`;
 
 		await page.goto("/products/new");
 		await expect(page.getByRole("heading", { name: "Create Product" })).toBeVisible({
@@ -280,9 +280,9 @@ test.describe("Feature CRUD", () => {
 		await page.locator("#feature-status").click();
 		await page.getByRole("option", { name: "Ready" }).click();
 
-		await page.getByRole("button", { name: "Add" }).click();
+		await page.getByRole("button", { name: "Add", exact: true }).click();
 		await page.locator('input[placeholder="Criterion 1"]').fill("Users can login with Google");
-		await page.getByRole("button", { name: "Add" }).click();
+		await page.getByRole("button", { name: "Add", exact: true }).click();
 		await page
 			.locator('input[placeholder="Criterion 2"]')
 			.fill("Session persists across page refreshes");
@@ -398,11 +398,11 @@ test.describe("Feature CRUD", () => {
 		await expect(page.getByRole("dialog")).toBeVisible();
 		await page.locator("#feature-title").fill(featureTitle);
 
-		await page.getByRole("button", { name: "Add" }).click();
+		await page.getByRole("button", { name: "Add", exact: true }).click();
 		await page.locator('input[placeholder="Criterion 1"]').fill("API returns JSON");
-		await page.getByRole("button", { name: "Add" }).click();
+		await page.getByRole("button", { name: "Add", exact: true }).click();
 		await page.locator('input[placeholder="Criterion 2"]').fill("Error handling implemented");
-		await page.getByRole("button", { name: "Add" }).click();
+		await page.getByRole("button", { name: "Add", exact: true }).click();
 		await page.locator('input[placeholder="Criterion 3"]').fill("Rate limiting works");
 
 		await page.getByRole("button", { name: "Add Feature" }).click();
