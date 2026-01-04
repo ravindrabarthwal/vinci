@@ -27,6 +27,7 @@ export const authComponent = createClient<DataModel, typeof authSchema>(componen
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
 	return {
 		baseURL: siteUrl,
+		secret: process.env.BETTER_AUTH_SECRET ?? "local-development-secret-32-chars-min",
 		database: authComponent.adapter(ctx),
 		emailAndPassword: {
 			enabled: true,
