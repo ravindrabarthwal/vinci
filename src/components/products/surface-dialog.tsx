@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Surface, SurfaceType } from "@/components/products/types";
 import { getDialogSubmitLabel, surfaceTypeLabels } from "@/components/products/types";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ export function SurfaceDialog({
 	const [location, setLocation] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const hasInitialized = useRef(false);
 
 	// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-member-access
 	const { api } = require("../../../convex/_generated/api");
@@ -58,13 +59,19 @@ export function SurfaceDialog({
 	const updateSurface = useMutation(api.products?.updateSurface);
 
 	useEffect(() => {
-		if (!open) return;
+		if (!open) {
+			hasInitialized.current = false;
+			return;
+		}
+
+		if (hasInitialized.current) return;
 
 		const isEditMode = mode === "edit" && initialData;
 		setName(isEditMode ? initialData.name : "");
 		setType(isEditMode ? initialData.type : "repo");
 		setLocation(isEditMode ? (initialData.location ?? "") : "");
 		setError(null);
+		hasInitialized.current = true;
 	}, [open, mode, initialData]);
 
 	const handleSubmit = async (e: React.FormEvent) => {

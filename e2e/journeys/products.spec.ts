@@ -416,12 +416,14 @@ test.describe("Feature CRUD", () => {
 
 		await expect(page.getByRole("dialog")).toBeVisible();
 
-		const criteriaInputs = page.locator('input[placeholder^="Criterion"]');
+		// Scope all criterion-related locators to the dialog
+		const dialog = page.getByRole("dialog");
+		const criteriaInputs = dialog.locator('input[placeholder^="Criterion"]');
 		await expect(criteriaInputs).toHaveCount(3);
 
-		const trashButtons = page
-			.locator("form .space-y-2 button[type='button']")
-			.filter({ has: page.locator("svg") });
+		// Get only trash buttons (variant="ghost" with TrashIcon), not the Add button (variant="outline")
+		const trashButtons = dialog.locator('button[type="button"]:has(svg.text-muted-foreground)');
+		await expect(trashButtons).toHaveCount(3);
 		await trashButtons.nth(1).click();
 
 		await expect(criteriaInputs).toHaveCount(2);

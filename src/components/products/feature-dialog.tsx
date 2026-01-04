@@ -2,7 +2,7 @@
 
 import { useMutation } from "convex/react";
 import { PlusIcon, TrashIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Feature, FeatureStatus } from "@/components/products/types";
 import { getDialogSubmitLabel } from "@/components/products/types";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export function FeatureDialog({
 	const [acceptanceCriteria, setAcceptanceCriteria] = useState<string[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const hasInitialized = useRef(false);
 
 	// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-member-access
 	const { api } = require("../../../convex/_generated/api");
@@ -66,7 +67,12 @@ export function FeatureDialog({
 	const updateFeature = useMutation(api.products?.updateFeature);
 
 	useEffect(() => {
-		if (!open) return;
+		if (!open) {
+			hasInitialized.current = false;
+			return;
+		}
+
+		if (hasInitialized.current) return;
 
 		const isEditMode = mode === "edit" && initialData;
 		setTitle(isEditMode ? initialData.title : "");
@@ -74,6 +80,7 @@ export function FeatureDialog({
 		setStatus(isEditMode ? initialData.status : "draft");
 		setAcceptanceCriteria(isEditMode ? [...initialData.acceptanceCriteria] : []);
 		setError(null);
+		hasInitialized.current = true;
 	}, [open, mode, initialData]);
 
 	const handleAddCriterion = () => {
