@@ -90,7 +90,7 @@ async function requireOrgAccess(ctx: Ctx, organizationId: string): Promise<void>
 async function getProductWithAccess(ctx: Ctx, productId: Id<"product">, organizationId: string) {
 	await requireOrgAccess(ctx, organizationId);
 	const product = await ctx.db.get(productId);
-	if (!product || product.organizationId !== organizationId) {
+	if (product?.organizationId !== organizationId) {
 		return null;
 	}
 	return product;
@@ -107,7 +107,7 @@ async function requireProductAccess(ctx: Ctx, productId: Id<"product">, organiza
 async function requireSurfaceAccess(ctx: Ctx, surfaceId: Id<"surface">, organizationId: string) {
 	await requireOrgAccess(ctx, organizationId);
 	const surface = await ctx.db.get(surfaceId);
-	if (!surface || surface.organizationId !== organizationId) {
+	if (surface?.organizationId !== organizationId) {
 		throw new Error("Surface not found");
 	}
 	return surface;
@@ -116,7 +116,7 @@ async function requireSurfaceAccess(ctx: Ctx, surfaceId: Id<"surface">, organiza
 async function requireFeatureAccess(ctx: Ctx, featureId: Id<"feature">, organizationId: string) {
 	await requireOrgAccess(ctx, organizationId);
 	const feature = await ctx.db.get(featureId);
-	if (!feature || feature.organizationId !== organizationId) {
+	if (feature?.organizationId !== organizationId) {
 		throw new Error("Feature not found");
 	}
 	return feature;
