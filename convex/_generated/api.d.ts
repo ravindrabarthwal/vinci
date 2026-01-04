@@ -15,6 +15,7 @@ import type * as lib_log from "../lib/log.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_organizations from "../model/organizations.js";
 import type * as organizations from "../organizations.js";
+import type * as products from "../products.js";
 
 import type {
   ApiFromModules,
@@ -30,7 +31,8 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   "model/organizations": typeof model_organizations;
   organizations: typeof organizations;
-}>;
+  products: typeof products;
+}>;;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
