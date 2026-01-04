@@ -53,3 +53,14 @@ export const statusColors: Readonly<Record<FeatureStatus, string>> = {
 	in_progress: "bg-purple-100 text-purple-800",
 	completed: "bg-green-100 text-green-800",
 };
+
+export function getDialogSubmitLabel(
+	mode: "create" | "edit",
+	isSubmitting: boolean,
+	entityName: string,
+): string {
+	if (isSubmitting) {
+		return mode === "create" ? "Adding..." : "Saving...";
+	}
+	return mode === "create" ? `Add ${entityName}` : "Save Changes";
+}

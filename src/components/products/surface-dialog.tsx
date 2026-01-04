@@ -3,7 +3,7 @@
 import { useMutation } from "convex/react";
 import { useEffect, useState } from "react";
 import type { Surface, SurfaceType } from "@/components/products/types";
-import { surfaceTypeLabels } from "@/components/products/types";
+import { getDialogSubmitLabel, surfaceTypeLabels } from "@/components/products/types";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -104,13 +104,7 @@ export function SurfaceDialog({
 		mode === "create"
 			? "Add a new deployable surface to this product"
 			: "Update the surface details";
-	const submitLabel = isSubmitting
-		? mode === "create"
-			? "Adding..."
-			: "Saving..."
-		: mode === "create"
-			? "Add Surface"
-			: "Save Changes";
+	const submitLabel = getDialogSubmitLabel(mode, isSubmitting, "Surface");
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>

@@ -4,6 +4,7 @@ import { useMutation } from "convex/react";
 import { PlusIcon, TrashIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Feature, FeatureStatus } from "@/components/products/types";
+import { getDialogSubmitLabel } from "@/components/products/types";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -130,13 +131,7 @@ export function FeatureDialog({
 		mode === "create"
 			? "Add a new feature or outcome request to track"
 			: "Update the feature details";
-	const submitLabel = isSubmitting
-		? mode === "create"
-			? "Adding..."
-			: "Saving..."
-		: mode === "create"
-			? "Add Feature"
-			: "Save Changes";
+	const submitLabel = getDialogSubmitLabel(mode, isSubmitting, "Feature");
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
