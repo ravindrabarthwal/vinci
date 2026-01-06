@@ -135,6 +135,12 @@ jobs:
       - name: Install project dependencies
         run: bun install
 
+      - name: Install Playwright Browsers
+        run: bunx playwright install --with-deps
+      
+      - name: Install Playwright Browsers
+        run: bunx playwright install --with-deps
+      
       - name: Setup OpenCode with oh-my-opencode plugin
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
@@ -406,6 +412,10 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           REPO_NAME: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          USER_COMMENT: ${{ steps.context.outputs.comment }}
+          COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
+          CONTEXT_TYPE: ${{ steps.context.outputs.type }}
+          CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
         run: |
           echo "Verification failed. Attempting to fix..."
           set -euo pipefail
@@ -421,14 +431,23 @@ jobs:
           
           You are running in the 'Verify Loop'. The previous changes caused tests to fail.
           
+          ### Original Context
+          - Repository: ${REPO_NAME}
+          - Trigger: ${{ github.event_name }}
+          - Context Type: ${CONTEXT_TYPE}
+          - Context Number: ${CONTEXT_NUMBER}
+          - Original Author: @${COMMENT_AUTHOR}
+          - Original Comment:
+          ${USER_COMMENT}
+
           ### Failure Log (Truncated)
           \`\`\`
           ${TEST_OUTPUT}
           \`\`\`
           
           ### Instructions
-          1. Analyze the failure.
-          2. Fix the code.
+          1. Analyze the failure log in the context of the original request.
+          2. Fix the code to address the test failures.
           3. Verify your fix locally if possible (by running tests).
           4. When satisfied, simply finish. The workflow will commit your changes.
           
@@ -455,7 +474,20 @@ jobs:
         if: steps.verify_1.outputs.outcome == 'failure'
         run: |
           echo "Running verification after fix..."
-          bun run test
+          set +e
+          bun run test > test_output_fix.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+          
+          echo "Test Exit Code after fix: $EXIT_CODE"
+          cat test_output_fix.txt
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "Verification after fix failed. The agent was unable to resolve the issue."
+            # This will cause the job to fail, triggering the 'on: failure' steps.
+            exit 1
+          fi
+          echo "Verification after fix passed!"
 
       - name: Emit Success Event
         if: success()
