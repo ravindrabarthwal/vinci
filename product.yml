@@ -1,0 +1,5 @@
+name: Vinci Product
+repositories:
+  - name: vinci
+    type: monorepo
+    criticality: high

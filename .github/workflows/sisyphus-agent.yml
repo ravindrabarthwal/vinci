@@ -8,24 +8,34 @@ on:
         required: false
   issue_comment:
     types: [created]
+  pull_request:
+    types: [synchronize]
+  workflow_run:
+    workflows: ["Sisyphus Agent"]
+    types: [completed]
 
 jobs:
   agent:
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.comment.body, '@sisyphus-agent') &&
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@sisyphus-agent') &&
        github.event.comment.user.login != 'sisyphus-agent' &&
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
 
     permissions:
-      contents: read
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write
 
     env:
       GH_TOKEN: ${{ secrets.GH_PAT }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0
@@ -35,8 +45,67 @@ jobs:
           git config user.name "${{ vars.GIT_USER_NAME }}"
           git config user.email "${{ vars.GIT_USER_EMAIL }}"
 
+      - name: Read Product Manifest
+        id: product_manifest
+        run: |
+          if [ -f product.yml ]; then
+             echo "Product manifest found."
+             cat product.yml
+             # Read content into env var, handling newlines for multiline string
+             echo "PRODUCT_SCOPE<<EOF" >> $GITHUB_ENV
+             cat product.yml >> $GITHUB_ENV
+             echo "EOF" >> $GITHUB_ENV
+          else
+             echo "Product manifest not found, defaulting to single-repo."
+             echo "PRODUCT_SCOPE=single-repo" >> $GITHUB_ENV
+          fi
+
       - name: Verify gh CLI auth
         run: gh auth status
+
+      - name: Generate Agent Run ID
+        id: run_id
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          AGENT_RUN_ID="run-${{ github.run_id }}-${{ github.run_attempt }}-${SHORT_SHA}"
+          echo "AGENT_RUN_ID=${AGENT_RUN_ID}" >> $GITHUB_ENV
+          echo "Generated Run ID: ${AGENT_RUN_ID}"
+
+      - name: Determine Environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "AGENT_ENVIRONMENT=Production" >> $GITHUB_ENV
+            echo "Environment: Production"
+          else
+            echo "AGENT_ENVIRONMENT=Development" >> $GITHUB_ENV
+            echo "Environment: Development"
+          fi
+
+      - name: Emit Start Event
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg run_id "$AGENT_RUN_ID" \
+            --arg repo "${{ github.repository }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg environment "$AGENT_ENVIRONMENT" \
+            --arg status "started" \
+            --arg actor "${{ github.actor }}" \
+            '{run_id: $run_id, repo: $repo, branch: $branch, environment: $environment, status: $status, actor: $actor}')
+          
+          echo "Simulating webhook event: start"
+          echo "Payload: $PAYLOAD"
+          # curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" https://api.vinci.dev/webhooks/agent || true
+
+      - name: Initialize State
+        run: |
+          echo '{"step": "init", "attempt_count": 0, "status": "running"}' > agent_state.json
+          
+      - name: Upload State Artifact (Init)
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent_state_${{ env.AGENT_RUN_ID }}
+          path: agent_state.json
+          overwrite: true
 
       - name: Ensure tmux is available
         if: runner.os == 'Linux'
@@ -97,7 +166,6 @@ jobs:
             "plugin": ["oh-my-opencode"]
           }' > ~/.config/opencode/opencode.json
 
-          # Use OH_MY_OPENCODE_CONFIG env var if present, otherwise use default config
           if [[ -n "${OH_MY_OPENCODE_CONFIG:-}" ]]; then
             echo "Using oh-my-opencode config from environment variable"
             echo "$OH_MY_OPENCODE_CONFIG" > ~/.config/opencode/oh-my-opencode.json
@@ -200,11 +268,6 @@ jobs:
           echo "$OPENCODE_AUTH_JSON" > ~/.local/share/opencode/auth.json
           chmod 600 ~/.local/share/opencode/auth.json
 
-          echo "=== opencode.json ==="
-          jq . ~/.config/opencode/opencode.json
-          echo "=== oh-my-opencode.json ==="
-          jq . ~/.config/opencode/oh-my-opencode.json
-
       - name: Collect Context
         id: context
         env:
@@ -227,13 +290,17 @@ jobs:
               echo "type=issue" >> $GITHUB_OUTPUT
               echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
             fi
+            
+            echo "comment<<EOF" >> $GITHUB_OUTPUT
+            echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+            echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+          
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+             echo "type=dispatch" >> $GITHUB_OUTPUT
+             echo "author=${{ github.actor }}" >> $GITHUB_OUTPUT
           fi
-
-          echo "comment<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
-          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Add eyes reaction
         if: steps.context.outputs.comment_id != ''
@@ -260,7 +327,8 @@ jobs:
               --add-label "sisyphus: working" || true
           fi
 
-      - name: Run oh-my-opencode
+      - name: Plan and Implement (Phase 1)
+        if: github.event_name == 'issue_comment' || github.event_name == 'workflow_dispatch'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           USER_COMMENT: ${{ steps.context.outputs.comment }}
@@ -272,6 +340,9 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="$HOME/.opencode/bin:$PATH"
+
+          # Update state
+          echo '{"step": "plan", "attempt_count": 0, "status": "running"}' > agent_state.json
 
           cat > /tmp/prompt.txt <<PROMPT_EOF
           Your username is @sisyphus-agent, mentioned by @${COMMENT_AUTHOR} in ${REPO_NAME}.
@@ -295,18 +366,136 @@ jobs:
           PROMPT=$(cat /tmp/prompt.txt)
           stdbuf -oL -eL bunx oh-my-opencode run "$PROMPT"
 
-      - name: Push changes
-        if: always()
+      - name: Push changes (Post-Plan)
+        if: github.event_name == 'issue_comment' || github.event_name == 'workflow_dispatch'
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git add -A
-            git commit -m "chore: changes by sisyphus-agent" || true
+            git commit -m "chore: changes by sisyphus-agent (plan phase)" || true
           fi
 
           BRANCH=$(git branch --show-current)
           if [[ "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
             git push origin "$BRANCH" || true
           fi
+
+      - name: Verify (Phase 1)
+        id: verify_1
+        run: |
+          echo "Running verification..."
+          set +e
+          bun run test > test_output.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+          
+          echo "Test Exit Code: $EXIT_CODE"
+          cat test_output.txt
+          
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "outcome=success" >> $GITHUB_OUTPUT
+            echo "Verification passed!"
+          else
+            echo "outcome=failure" >> $GITHUB_OUTPUT
+            echo "Verification failed!"
+          fi
+
+      - name: Fix (Phase 1 - The Agent Self-Repair)
+        id: fix_1
+        if: steps.verify_1.outputs.outcome == 'failure'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          echo "Verification failed. Attempting to fix..."
+          set -euo pipefail
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          # Update state
+          echo '{"step": "fix", "attempt_count": 1, "status": "fixing"}' > agent_state.json
+          
+          TEST_OUTPUT=$(cat test_output.txt | tail -n 50) # Get last 50 lines of failure
+
+          cat > /tmp/fix_prompt.txt <<PROMPT_EOF
+          ## TASK: FIX VERIFICATION FAILURES
+          
+          You are running in the 'Verify Loop'. The previous changes caused tests to fail.
+          
+          ### Failure Log (Truncated)
+          \`\`\`
+          ${TEST_OUTPUT}
+          \`\`\`
+          
+          ### Instructions
+          1. Analyze the failure.
+          2. Fix the code.
+          3. Verify your fix locally if possible (by running tests).
+          4. When satisfied, simply finish. The workflow will commit your changes.
+          
+          DO NOT create a new PR. Fix the files in the current branch.
+          PROMPT_EOF
+
+          PROMPT=$(cat /tmp/fix_prompt.txt)
+          stdbuf -oL -eL bunx oh-my-opencode run "$PROMPT"
+
+      - name: Push changes (Post-Fix)
+        if: steps.verify_1.outputs.outcome == 'failure'
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add -A
+            git commit -m "fix: automatic fix by sisyphus-agent" || true
+          fi
+
+          BRANCH=$(git branch --show-current)
+          if [[ "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
+            git push origin "$BRANCH" || true
+          fi
+
+      - name: Verify (Phase 2 - After Fix)
+        if: steps.verify_1.outputs.outcome == 'failure'
+        run: |
+          echo "Running verification after fix..."
+          bun run test
+
+      - name: Emit Success Event
+        if: success()
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg run_id "$AGENT_RUN_ID" \
+            --arg repo "${{ github.repository }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg environment "$AGENT_ENVIRONMENT" \
+            --arg status "success" \
+            --arg actor "${{ github.actor }}" \
+            '{run_id: $run_id, repo: $repo, branch: $branch, environment: $environment, status: $status, actor: $actor}')
+          
+          echo "Simulating webhook event: success"
+          echo "Payload: $PAYLOAD"
+          # curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" https://api.vinci.dev/webhooks/agent || true
+
+      - name: Emit Failure Event
+        if: failure()
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg run_id "$AGENT_RUN_ID" \
+            --arg repo "${{ github.repository }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg environment "$AGENT_ENVIRONMENT" \
+            --arg status "failure" \
+            --arg actor "${{ github.actor }}" \
+            '{run_id: $run_id, repo: $repo, branch: $branch, environment: $environment, status: $status, actor: $actor}')
+          
+          echo "Simulating webhook event: failure"
+          echo "Payload: $PAYLOAD"
+          # curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" https://api.vinci.dev/webhooks/agent || true
+
+      - name: Upload State Artifact (Final)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent_state_final_${{ env.AGENT_RUN_ID }}
+          path: agent_state.json
+          overwrite: true
 
       - name: Update reaction and remove label
         if: always()
