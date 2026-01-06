@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboardIcon } from "lucide-react";
+import { LayoutDashboardIcon, PackageIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavUser } from "@/components/sidebar/nav-user";
@@ -35,6 +35,14 @@ export function AppSidebar() {
 									<Link href="/dashboard">
 										<LayoutDashboardIcon />
 										<span>Dashboard</span>
+									</Link>
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+							<SidebarMenuItem>
+								<SidebarMenuButton asChild isActive={pathname.startsWith("/products")}>
+									<Link href="/products">
+										<PackageIcon />
+										<span>Products</span>
 									</Link>
 								</SidebarMenuButton>
 							</SidebarMenuItem>
