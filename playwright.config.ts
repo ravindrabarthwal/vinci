@@ -41,7 +41,7 @@ export default defineConfig({
 		command: process.env.CI ? "bun run dev:all:ci" : "bun run dev:all",
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
-		timeout: 180000,
+		timeout: 300000,
 		stdout: "pipe",
 		stderr: "pipe",
 		env: {

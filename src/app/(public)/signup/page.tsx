@@ -58,7 +58,7 @@ export default function SignupPage() {
 			if (result.error) {
 				setError(result.error.message ?? "Failed to sign up");
 			} else {
-				router.push("/dashboard");
+				router.push("/org/new");
 			}
 		} catch {
 			setError("An unexpected error occurred");

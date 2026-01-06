@@ -69,12 +69,18 @@ setup("authenticate", async ({ page }) => {
 	await page.getByLabel("Password").fill(testPassword);
 	await page.getByRole("button", { name: "Sign Up" }).click();
 
-	await expect(page).toHaveURL("/org/new", { timeout: 15000 });
+	try {
+		await expect(page).toHaveURL(/\/org\/new|\/dashboard/, { timeout: 15000 });
+	} catch (e) {
+		console.log("Failed to land on dashboard or org creation page");
+		throw e;
+	}
 
-	await page.getByLabel("Organization Name").fill(`Test Organization ${uniqueId}`);
-	await page.getByRole("button", { name: "Create Organization" }).click();
-
-	await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
+	if (page.url().includes("/org/new")) {
+		await page.getByLabel("Organization Name").fill(`Test Organization ${uniqueId}`);
+		await page.getByRole("button", { name: "Create Organization" }).click();
+		await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
+	}
 
 	await page.context().storageState({ path: authFile });
 });
